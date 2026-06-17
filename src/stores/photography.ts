@@ -46,16 +46,18 @@ export const usePhotographyStore = defineStore('photography', () => {
 
   function updateContractItem(id: string, contractPrice: number) {
     const budgetStore = useBudgetStore()
+    items.value.forEach((item) => {
+      if (item.id !== id) {
+        item.contracted = false
+        item.contractPrice = 0
+      }
+    })
     const index = items.value.findIndex(item => item.id === id)
     if (index !== -1) {
       items.value[index].contracted = true
       items.value[index].contractPrice = contractPrice
       
-      const totalContracted = items.value
-        .filter(p => p.contracted)
-        .reduce((sum, p) => sum + p.contractPrice, 0)
-      
-      budgetStore.updateActualByCategory('摄影', totalContracted)
+      budgetStore.updateActualByCategory('摄影', contractPrice)
     }
   }
 
@@ -65,12 +67,8 @@ export const usePhotographyStore = defineStore('photography', () => {
     if (index !== -1) {
       items.value[index].contracted = false
       items.value[index].contractPrice = 0
-      
-      const totalContracted = items.value
-        .filter(p => p.contracted)
-        .reduce((sum, p) => sum + p.contractPrice, 0)
-      
-      budgetStore.updateActualByCategory('摄影', totalContracted)
+
+      budgetStore.updateActualByCategory('摄影', 0)
     }
   }
 

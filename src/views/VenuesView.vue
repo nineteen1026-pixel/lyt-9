@@ -1,13 +1,31 @@
 <script setup lang="ts">
 import { ref } from 'vue'
+import { useRouter } from 'vue-router'
 import { useVenuesStore, type VenueStatus } from '@/stores/venues'
 import { MapPin, Users, Tag, CheckCircle, Star, X, FileSignature } from 'lucide-vue-next'
+import Toast from '@/components/Toast.vue'
 
+const router = useRouter()
 const venuesStore = useVenuesStore()
 
 const showContractModal = ref(false)
 const selectedVenueId = ref<string | null>(null)
 const contractPrice = ref(0)
+
+const toastVisible = ref(false)
+const toastMessage = ref('')
+const toastDescription = ref('')
+const toastType = ref<'success' | 'error' | 'warning' | 'info'>('success')
+
+const showToast = (message: string, description?: string, type: 'success' | 'error' | 'warning' | 'info' = 'success', duration = 2500) => {
+  toastMessage.value = message
+  toastDescription.value = description ?? ''
+  toastType.value = type
+  toastVisible.value = true
+  setTimeout(() => {
+    toastVisible.value = false
+  }, duration)
+}
 
 const getStatusConfig = (status: VenueStatus) => {
   switch (status) {
@@ -36,13 +54,24 @@ const closeContractModal = () => {
 
 const confirmContract = () => {
   if (selectedVenueId.value && contractPrice.value > 0) {
+    const venue = venuesStore.getVenueById(selectedVenueId.value)
     venuesStore.updateContractVenue(selectedVenueId.value, contractPrice.value)
     closeContractModal()
+    showToast(
+      '场地签约成功！',
+      `${venue?.name ?? ''} 已签约 ${formatPrice(contractPrice.value)}`,
+      'success',
+      2000
+    )
+    setTimeout(() => {
+      router.push('/budget')
+    }, 1500)
   }
 }
 
 const cancelContract = (venueId: string) => {
   venuesStore.cancelContractVenue(venueId)
+  showToast('已取消签约', '', 'info')
 }
 </script>
 
@@ -195,6 +224,13 @@ const cancelContract = (venueId: string) => {
           </div>
         </div>
       </Teleport>
+
+      <Toast 
+        :visible="toastVisible" 
+        :message="toastMessage" 
+        :description="toastDescription"
+        :type="toastType" 
+      />
     </div>
   </div>
 </template>

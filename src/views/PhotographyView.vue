@@ -1,14 +1,32 @@
 <script setup lang="ts">
 import { ref } from 'vue'
+import { useRouter } from 'vue-router'
 import { usePhotographyStore } from '@/stores/photography'
 import { Camera, Video, BookOpen, Gift, Check, X, FileSignature, CheckCircle, Calendar, Palette } from 'lucide-vue-next'
+import Toast from '@/components/Toast.vue'
 
+const router = useRouter()
 const photographyStore = usePhotographyStore()
 const activeTab = ref(1)
 
 const showContractModal = ref(false)
 const selectedItemId = ref<string | null>(null)
 const contractPrice = ref(0)
+
+const toastVisible = ref(false)
+const toastMessage = ref('')
+const toastDescription = ref('')
+const toastType = ref<'success' | 'error' | 'warning' | 'info'>('success')
+
+const showToast = (message: string, description?: string, type: 'success' | 'error' | 'warning' | 'info' = 'success', duration = 2500) => {
+  toastMessage.value = message
+  toastDescription.value = description ?? ''
+  toastType.value = type
+  toastVisible.value = true
+  setTimeout(() => {
+    toastVisible.value = false
+  }, duration)
+}
 
 const formatPrice = (price: number) => {
   return `¥${price.toLocaleString()}`
@@ -39,13 +57,24 @@ const closeContractModal = () => {
 
 const confirmContract = () => {
   if (selectedItemId.value && contractPrice.value > 0) {
+    const item = photographyStore.getItemById(selectedItemId.value)
     photographyStore.updateContractItem(selectedItemId.value, contractPrice.value)
     closeContractModal()
+    showToast(
+      '摄影签约成功！',
+      `${item?.teamName ?? ''} 已签约 ${formatPrice(contractPrice.value)}`,
+      'success',
+      2000
+    )
+    setTimeout(() => {
+      router.push('/budget')
+    }, 1500)
   }
 }
 
 const cancelContract = (itemId: string) => {
   photographyStore.cancelContractItem(itemId)
+  showToast('已取消签约', '', 'info')
 }
 </script>
 
@@ -291,6 +320,13 @@ const cancelContract = (itemId: string) => {
           </div>
         </div>
       </Teleport>
+
+      <Toast 
+        :visible="toastVisible" 
+        :message="toastMessage" 
+        :description="toastDescription"
+        :type="toastType" 
+      />
     </div>
   </div>
 </template>

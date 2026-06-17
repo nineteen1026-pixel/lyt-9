@@ -1,14 +1,32 @@
 <script setup lang="ts">
 import { ref, computed } from 'vue'
+import { useRouter } from 'vue-router'
 import { useDressStore, type DressCategory } from '@/stores/dress'
 import { Shirt, Ruler, Clock, ChevronRight, Tag, Palette, X, FileSignature, CheckCircle } from 'lucide-vue-next'
+import Toast from '@/components/Toast.vue'
 
+const router = useRouter()
 const dressStore = useDressStore()
 const activeCategory = ref<DressCategory>('主纱')
 
 const showContractModal = ref(false)
 const selectedDressId = ref<string | null>(null)
 const contractPrice = ref(0)
+
+const toastVisible = ref(false)
+const toastMessage = ref('')
+const toastDescription = ref('')
+const toastType = ref<'success' | 'error' | 'warning' | 'info'>('success')
+
+const showToast = (message: string, description?: string, type: 'success' | 'error' | 'warning' | 'info' = 'success', duration = 2500) => {
+  toastMessage.value = message
+  toastDescription.value = description ?? ''
+  toastType.value = type
+  toastVisible.value = true
+  setTimeout(() => {
+    toastVisible.value = false
+  }, duration)
+}
 
 const categories: { key: DressCategory; label: string }[] = [
   { key: '主纱', label: '主纱' },
@@ -38,13 +56,24 @@ const closeContractModal = () => {
 
 const confirmContract = () => {
   if (selectedDressId.value && contractPrice.value > 0) {
+    const dress = dressStore.getDressById(selectedDressId.value)
     dressStore.updateContractDress(selectedDressId.value, contractPrice.value)
     closeContractModal()
+    showToast(
+      '婚纱签约成功！',
+      `${dress?.name ?? dress?.style ?? ''} 已签约 ${formatPrice(contractPrice.value)}`,
+      'success',
+      2000
+    )
+    setTimeout(() => {
+      router.push('/budget')
+    }, 1500)
   }
 }
 
 const cancelContract = (dressId: string) => {
   dressStore.cancelContractDress(dressId)
+  showToast('已取消签约', '', 'info')
 }
 </script>
 
@@ -252,6 +281,13 @@ const cancelContract = (dressId: string) => {
           </div>
         </div>
       </Teleport>
+
+      <Toast 
+        :visible="toastVisible" 
+        :message="toastMessage" 
+        :description="toastDescription"
+        :type="toastType" 
+      />
     </div>
   </div>
 </template>

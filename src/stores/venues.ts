@@ -34,17 +34,20 @@ export const useVenuesStore = defineStore('venues', () => {
 
   function updateContractVenue(id: string, contractPrice: number) {
     const budgetStore = useBudgetStore()
+    venues.value.forEach((venue) => {
+      if (venue.id !== id) {
+        venue.contracted = false
+        venue.contractPrice = 0
+        venue.status = 'alternative'
+      }
+    })
     const index = venues.value.findIndex(venue => venue.id === id)
     if (index !== -1) {
       venues.value[index].contracted = true
       venues.value[index].contractPrice = contractPrice
       venues.value[index].status = 'booked'
-      
-      const totalContracted = venues.value
-        .filter(v => v.contracted)
-        .reduce((sum, v) => sum + v.contractPrice, 0)
-      
-      budgetStore.updateActualByCategory('场地', totalContracted)
+
+      budgetStore.updateActualByCategory('场地', contractPrice)
     }
   }
 
@@ -54,12 +57,9 @@ export const useVenuesStore = defineStore('venues', () => {
     if (index !== -1) {
       venues.value[index].contracted = false
       venues.value[index].contractPrice = 0
-      
-      const totalContracted = venues.value
-        .filter(v => v.contracted)
-        .reduce((sum, v) => sum + v.contractPrice, 0)
-      
-      budgetStore.updateActualByCategory('场地', totalContracted)
+      venues.value[index].status = 'alternative'
+
+      budgetStore.updateActualByCategory('场地', 0)
     }
   }
 

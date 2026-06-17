@@ -15,11 +15,16 @@ const totalSpent = computed(() => budgetStore.items.reduce((sum, item) => sum + 
 const remaining = computed(() => totalBudget.value - totalSpent.value)
 const progress = computed(() => Math.min((totalSpent.value / totalBudget.value) * 100, 100))
 
+const isOverBudget = (budget: number, actual: number) => {
+  return actual > budget
+}
+
 const pieData = computed(() =>
   budgetStore.items.map(item => ({
     name: item.category,
     value: item.actual,
-    color: item.color
+    color: item.color,
+    overBudget: isOverBudget(item.budget, item.actual)
   }))
 )
 
@@ -27,10 +32,6 @@ const getDifferenceClass = (diff: number) => {
   if (diff > 0) return 'text-green-500'
   if (diff < 0) return 'text-red-500'
   return 'text-gray-500'
-}
-
-const isOverBudget = (budget: number, actual: number) => {
-  return actual > budget
 }
 
 const getDifferenceIcon = (diff: number) => {

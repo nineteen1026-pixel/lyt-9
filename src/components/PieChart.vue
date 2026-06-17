@@ -10,6 +10,7 @@ interface PieDataItem {
   name: string
   value: number
   color: string
+  overBudget?: boolean
 }
 
 const props = defineProps<{
@@ -48,11 +49,21 @@ const initChart = () => {
       textStyle: {
         color: '#666',
         fontSize: 13,
-        padding: [0, 0, 0, 8]
+        padding: [0, 0, 0, 8],
+        rich: {
+          over: {
+            color: '#EF4444',
+            fontWeight: 'bold'
+          }
+        }
       },
       formatter: (name: string) => {
         const item = props.data.find(d => d.name === name)
-        return item ? `${name}  ¥${item.value.toLocaleString()}` : name
+        if (!item) return name
+        const suffix = item.overBudget ? ' (超支)' : ''
+        return item.overBudget 
+          ? `{over|${name}${suffix}}  ¥${item.value.toLocaleString()}`
+          : `${name}${suffix}  ¥${item.value.toLocaleString()}`
       }
     },
     series: [
@@ -63,23 +74,16 @@ const initChart = () => {
         center: ['35%', '50%'],
         roseType: 'radius',
         itemStyle: {
-          borderRadius: 8,
-          borderColor: '#fff',
-          borderWidth: 2
-        },
-        label: {
-          show: true,
-          position: 'outside',
-          formatter: '{b}\n{d}%',
-          color: '#555',
-          fontSize: 12,
-          lineHeight: 18
+          borderRadius: 8
         },
         labelLine: {
           show: true,
           length: 15,
           length2: 10,
-          smooth: true
+          smooth: true,
+          lineStyle: {
+            color: '#999'
+          }
         },
         emphasis: {
           label: {
@@ -99,7 +103,33 @@ const initChart = () => {
           value: item.value,
           name: item.name,
           itemStyle: {
-            color: item.color
+            color: item.overBudget ? '#EF4444' : item.color,
+            borderColor: item.overBudget ? '#B91C1C' : '#fff',
+            borderWidth: item.overBudget ? 3 : 2,
+            borderRadius: 8,
+            shadowBlur: item.overBudget ? 15 : 0,
+            shadowColor: item.overBudget ? 'rgba(239, 68, 68, 0.5)' : 'transparent'
+          },
+          label: {
+            show: true,
+            position: 'outside',
+            formatter: item.overBudget ? `{over|${item.name}}(超支)\n{d}%` : `${item.name}\n{d}%`,
+            color: item.overBudget ? '#EF4444' : '#555',
+            fontSize: 12,
+            lineHeight: 18,
+            fontWeight: item.overBudget ? 'bold' : 'normal',
+            rich: {
+              over: {
+                color: '#EF4444',
+                fontWeight: 'bold'
+              }
+            }
+          },
+          labelLine: {
+            lineStyle: {
+              color: item.overBudget ? '#EF4444' : '#999',
+              width: item.overBudget ? 2 : 1
+            }
           }
         })),
         animationType: 'scale',
@@ -134,13 +164,49 @@ watch(
   () => {
     if (chartInstance) {
       chartInstance.setOption({
+        legend: {
+          formatter: (name: string) => {
+            const item = props.data.find(d => d.name === name)
+            if (!item) return name
+            const suffix = item.overBudget ? ' (超支)' : ''
+            return item.overBudget 
+              ? `{over|${name}${suffix}}  ¥${item.value.toLocaleString()}`
+              : `${name}${suffix}  ¥${item.value.toLocaleString()}`
+          }
+        },
         series: [
           {
             data: props.data.map(item => ({
               value: item.value,
               name: item.name,
               itemStyle: {
-                color: item.color
+                color: item.overBudget ? '#EF4444' : item.color,
+                borderColor: item.overBudget ? '#B91C1C' : '#fff',
+                borderWidth: item.overBudget ? 3 : 2,
+                borderRadius: 8,
+                shadowBlur: item.overBudget ? 15 : 0,
+                shadowColor: item.overBudget ? 'rgba(239, 68, 68, 0.5)' : 'transparent'
+              },
+              label: {
+                show: true,
+                position: 'outside',
+                formatter: item.overBudget ? `{over|${item.name}}(超支)\n{d}%` : `${item.name}\n{d}%`,
+                color: item.overBudget ? '#EF4444' : '#555',
+                fontSize: 12,
+                lineHeight: 18,
+                fontWeight: item.overBudget ? 'bold' : 'normal',
+                rich: {
+                  over: {
+                    color: '#EF4444',
+                    fontWeight: 'bold'
+                  }
+                }
+              },
+              labelLine: {
+                lineStyle: {
+                  color: item.overBudget ? '#EF4444' : '#999',
+                  width: item.overBudget ? 2 : 1
+                }
               }
             }))
           }
