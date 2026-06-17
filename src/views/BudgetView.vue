@@ -1,0 +1,201 @@
+<script setup lang="ts">
+import { ref, onMounted, computed } from 'vue'
+import * as echarts from 'echarts'
+import { useBudgetStore } from '@/stores/budget'
+import { Wallet, TrendingDown, TrendingUp, Target } from 'lucide-vue-next'
+
+const budgetStore = useBudgetStore()
+const chartRef = ref<HTMLDivElement | null>(null)
+let chartInstance: echarts.ECharts | null = null
+
+const formatCurrency = (value: number) => {
+  return `¥${value.toLocaleString()}`
+}
+
+const totalBudget = computed(() => budgetStore.items.reduce((sum, item) => sum + item.budget, 0))
+const totalSpent = computed(() => budgetStore.items.reduce((sum, item) => sum + item.actual, 0))
+const remaining = computed(() => totalBudget.value - totalSpent.value)
+const progress = computed(() => Math.min((totalSpent.value / totalBudget.value) * 100, 100))
+
+const initChart = () => {
+  if (!chartRef.value) return
+  
+  chartInstance = echarts.init(chartRef.value)
+  
+  const option = {
+    tooltip: {
+      trigger: 'item',
+      formatter: '{b}: ¥{c} ({d}%)'
+    },
+    legend: {
+      orient: 'vertical',
+      right: '5%',
+      top: 'center',
+      textStyle: {
+        color: '#666',
+        fontSize: 12
+      },
+      itemGap: 12
+    },
+    series: [
+      {
+        type: 'pie',
+        radius: ['40%', '70%'],
+        center: ['35%', '50%'],
+        avoidLabelOverlap: false,
+        itemStyle: {
+          borderRadius: 8,
+          borderColor: '#fff',
+          borderWidth: 2
+        },
+        label: {
+          show: false
+        },
+        emphasis: {
+          label: {
+            show: true,
+            fontSize: 14,
+            fontWeight: 'bold'
+          }
+        },
+        data: budgetStore.items.map(item => ({
+          value: item.actual,
+          name: item.category,
+          itemStyle: { color: item.color }
+        }))
+      }
+    ]
+  }
+  
+  chartInstance.setOption(option)
+}
+
+onMounted(() => {
+  initChart()
+  window.addEventListener('resize', () => {
+    chartInstance?.resize()
+  })
+})
+
+const getDifferenceClass = (diff: number) => {
+  if (diff > 0) return 'text-green-500'
+  if (diff < 0) return 'text-primary-500'
+  return 'text-gray-500'
+}
+
+const getDifferenceIcon = (diff: number) => {
+  if (diff > 0) return TrendingDown
+  if (diff < 0) return TrendingUp
+  return Target
+}
+</script>
+
+<template>
+  <div class="min-h-screen bg-gradient-to-br from-primary-50 via-ivory to-champagne-100 pb-20">
+    <div class="animate-fade-in">
+      <div class="bg-gradient-to-r from-primary-400 to-primary-500 px-6 pt-12 pb-16 rounded-b-3xl shadow-lg">
+        <h1 class="text-3xl font-serif font-bold text-white text-center">婚礼预算</h1>
+        <p class="text-primary-100 text-center mt-2">精心规划，幸福启航</p>
+      </div>
+
+      <div class="px-4 -mt-10">
+        <div class="grid grid-cols-2 gap-3 mb-6">
+          <div class="animate-slide-up bg-white rounded-2xl p-4 shadow-md" style="animation-delay: 0.1s">
+            <div class="flex items-center gap-2 mb-2">
+              <div class="w-10 h-10 rounded-xl bg-primary-100 flex items-center justify-center">
+                <Wallet class="w-5 h-5 text-primary-500" />
+              </div>
+              <span class="text-sm text-gray-500">总预算</span>
+            </div>
+            <p class="text-xl font-bold text-gray-800">{{ formatCurrency(totalBudget) }}</p>
+          </div>
+
+          <div class="animate-slide-up bg-white rounded-2xl p-4 shadow-md" style="animation-delay: 0.2s">
+            <div class="flex items-center gap-2 mb-2">
+              <div class="w-10 h-10 rounded-xl bg-champagne-100 flex items-center justify-center">
+                <TrendingUp class="w-5 h-5 text-champagne-300" />
+              </div>
+              <span class="text-sm text-gray-500">已支出</span>
+            </div>
+            <p class="text-xl font-bold text-champagne-300">{{ formatCurrency(totalSpent) }}</p>
+          </div>
+
+          <div class="animate-slide-up bg-white rounded-2xl p-4 shadow-md" style="animation-delay: 0.3s">
+            <div class="flex items-center gap-2 mb-2">
+              <div class="w-10 h-10 rounded-xl bg-green-100 flex items-center justify-center">
+                <TrendingDown class="w-5 h-5 text-green-500" />
+              </div>
+              <span class="text-sm text-gray-500">剩余</span>
+            </div>
+            <p class="text-xl font-bold text-green-500">{{ formatCurrency(remaining) }}</p>
+          </div>
+
+          <div class="animate-slide-up bg-white rounded-2xl p-4 shadow-md" style="animation-delay: 0.4s">
+            <div class="flex items-center gap-2 mb-2">
+              <div class="w-10 h-10 rounded-xl bg-primary-100 flex items-center justify-center">
+                <Target class="w-5 h-5 text-primary-500" />
+              </div>
+              <span class="text-sm text-gray-500">进度</span>
+            </div>
+            <p class="text-xl font-bold text-primary-500">{{ progress.toFixed(1) }}%</p>
+          </div>
+        </div>
+
+        <div class="w-full bg-white rounded-full h-3 mb-6 overflow-hidden shadow-inner animate-slide-up" style="animation-delay: 0.5s">
+          <div 
+            class="h-full bg-gradient-to-r from-primary-400 to-primary-500 rounded-full transition-all duration-1000 ease-out"
+            :style="{ width: `${progress}%` }"
+          ></div>
+        </div>
+
+        <div class="animate-slide-up bg-white rounded-2xl p-4 shadow-md mb-6" style="animation-delay: 0.6s">
+          <h2 class="text-lg font-bold text-gray-800 mb-4">支出分布</h2>
+          <div ref="chartRef" class="w-full h-64"></div>
+        </div>
+
+        <div class="animate-slide-up" style="animation-delay: 0.7s">
+          <h2 class="text-lg font-bold text-gray-800 mb-4">支出明细</h2>
+          <div class="space-y-3">
+            <div 
+              v-for="(item, index) in budgetStore.items" 
+              :key="item.id"
+              class="bg-white rounded-xl p-4 shadow-sm hover:shadow-md transition-all duration-300"
+              :style="{ animationDelay: `${0.8 + index * 0.1}s` }"
+            >
+              <div class="flex items-center justify-between">
+                <div class="flex items-center gap-3">
+                  <div 
+                    class="w-10 h-10 rounded-xl flex items-center justify-center"
+                    :style="{ backgroundColor: item.color + '20' }"
+                  >
+                    <div class="w-3 h-3 rounded-full" :style="{ backgroundColor: item.color }"></div>
+                  </div>
+                  <div>
+                    <p class="font-medium text-gray-800">{{ item.category }}</p>
+                    <p class="text-xs text-gray-400">预算: {{ formatCurrency(item.budget) }}</p>
+                  </div>
+                </div>
+                <div class="text-right">
+                  <p class="font-medium text-gray-800">{{ formatCurrency(item.actual) }}</p>
+                  <div class="flex items-center justify-end gap-1">
+                    <component 
+                      :is="getDifferenceIcon(item.budget - item.actual)" 
+                      class="w-3 h-3"
+                      :class="getDifferenceClass(item.budget - item.actual)"
+                    />
+                    <span 
+                      class="text-xs"
+                      :class="getDifferenceClass(item.budget - item.actual)"
+                    >
+                      {{ item.budget - item.actual > 0 ? '+' : '' }}{{ formatCurrency(item.budget - item.actual) }}
+                    </span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</template>
