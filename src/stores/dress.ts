@@ -10,6 +10,7 @@ import {
   type SizeChartRow,
   type FittingRecord
 } from '../data/mockData'
+import { useBudgetStore } from './budget'
 
 export { type Dress, type DressCategory, type SizeChartRow, type FittingRecord }
 
@@ -37,7 +38,9 @@ export const useDressStore = defineStore('dress', () => {
   function addDress(dress: Omit<Dress, 'id'>) {
     const newDress: Dress = {
       ...dress,
-      id: Date.now().toString()
+      id: Date.now().toString(),
+      contracted: dress.contracted ?? false,
+      contractPrice: dress.contractPrice ?? 0
     }
     dresses.value.push(newDress)
   }
@@ -49,10 +52,46 @@ export const useDressStore = defineStore('dress', () => {
     }
   }
 
+  function updateContractDress(id: string, contractPrice: number) {
+    const budgetStore = useBudgetStore()
+    const index = dresses.value.findIndex(dress => dress.id === id)
+    if (index !== -1) {
+      dresses.value[index].contracted = true
+      dresses.value[index].contractPrice = contractPrice
+      
+      const totalContracted = dresses.value
+        .filter(d => d.contracted)
+        .reduce((sum, d) => sum + d.contractPrice, 0)
+      
+      budgetStore.updateActualByCategory('婚纱', totalContracted)
+    }
+  }
+
+  function cancelContractDress(id: string) {
+    const budgetStore = useBudgetStore()
+    const index = dresses.value.findIndex(dress => dress.id === id)
+    if (index !== -1) {
+      dresses.value[index].contracted = false
+      dresses.value[index].contractPrice = 0
+      
+      const totalContracted = dresses.value
+        .filter(d => d.contracted)
+        .reduce((sum, d) => sum + d.contractPrice, 0)
+      
+      budgetStore.updateActualByCategory('婚纱', totalContracted)
+    }
+  }
+
   function deleteDress(id: string) {
+    const budgetStore = useBudgetStore()
     const index = dresses.value.findIndex(dress => dress.id === id)
     if (index !== -1) {
       dresses.value.splice(index, 1)
+
+      const totalContracted = dresses.value
+        .filter(d => d.contracted)
+        .reduce((sum, d) => sum + d.contractPrice, 0)
+      budgetStore.updateActualByCategory('婚纱', totalContracted)
     }
   }
 
@@ -70,6 +109,8 @@ export const useDressStore = defineStore('dress', () => {
     fittingRecords,
     addDress,
     updateDress,
+    updateContractDress,
+    cancelContractDress,
     deleteDress,
     getDressById,
     mainDress,

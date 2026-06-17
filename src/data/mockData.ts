@@ -32,6 +32,8 @@ export interface Venue {
   status: VenueStatus
   image: string
   features: string[]
+  contracted: boolean
+  contractPrice: number
 }
 
 export interface Photography {
@@ -41,6 +43,8 @@ export interface Photography {
   packageType: string
   price: number
   shootDate: string
+  contracted: boolean
+  contractPrice: number
 }
 
 export interface TeamMember {
@@ -83,6 +87,8 @@ export interface Dress {
   name: string
   brand: string
   color: string
+  contracted: boolean
+  contractPrice: number
 }
 
 export interface ScheduleItem {
@@ -164,15 +170,15 @@ export const mockGuests: Guest[] = [
 ]
 
 export const mockVenues: Venue[] = [
-  { id: '1', name: '花园酒店宴会厅', address: '北京市朝阳区建国路88号', capacity: 300, price: 48000, status: 'booked', image: 'https://images.unsplash.com/photo-1519167758481-83f550bb49b3?w=800', features: ['草坪婚礼', '中式宴席', '停车场', '化妆间'] },
-  { id: '2', name: '海景度假村', address: '青岛市市南区海滨路1号', capacity: 200, price: 68000, status: 'alternative', image: 'https://images.unsplash.com/photo-1464366400600-7168b8af9bc3?w=800', features: ['海边仪式', '西式自助', '海景套房', '烟花秀'] },
-  { id: '3', name: '法式庄园会所', address: '上海市浦东新区法式园区88号', capacity: 150, price: 58000, status: 'alternative', image: 'https://images.unsplash.com/photo-1465495976277-4387d4b0b4c6?w=800', features: ['法式花园', '高端定制', '红酒窖', '直升机坪'] }
+  { id: '1', name: '花园酒店宴会厅', address: '北京市朝阳区建国路88号', capacity: 300, price: 48000, status: 'booked', image: 'https://images.unsplash.com/photo-1519167758481-83f550bb49b3?w=800', features: ['草坪婚礼', '中式宴席', '停车场', '化妆间'], contracted: true, contractPrice: 48000 },
+  { id: '2', name: '海景度假村', address: '青岛市市南区海滨路1号', capacity: 200, price: 68000, status: 'alternative', image: 'https://images.unsplash.com/photo-1464366400600-7168b8af9bc3?w=800', features: ['海边仪式', '西式自助', '海景套房', '烟花秀'], contracted: false, contractPrice: 0 },
+  { id: '3', name: '法式庄园会所', address: '上海市浦东新区法式园区88号', capacity: 150, price: 58000, status: 'alternative', image: 'https://images.unsplash.com/photo-1465495976277-4387d4b0b4c6?w=800', features: ['法式花园', '高端定制', '红酒窖', '直升机坪'], contracted: false, contractPrice: 0 }
 ]
 
 export const mockPhotography: Photography[] = [
-  { id: '1', teamName: '光影纪摄影工作室', style: '清新自然', packageType: '全天跟拍', price: 12800, shootDate: '2024-10-01' },
-  { id: '2', teamName: '时光影像', style: '复古胶片', packageType: '半天跟拍', price: 6800, shootDate: '2024-09-28' },
-  { id: '3', teamName: '唯爱摄影', style: '韩式唯美', packageType: '旅拍套餐', price: 18800, shootDate: '2024-09-15' }
+  { id: '1', teamName: '光影纪摄影工作室', style: '清新自然', packageType: '全天跟拍', price: 12800, shootDate: '2024-10-01', contracted: true, contractPrice: 12800 },
+  { id: '2', teamName: '时光影像', style: '复古胶片', packageType: '半天跟拍', price: 6800, shootDate: '2024-09-28', contracted: false, contractPrice: 0 },
+  { id: '3', teamName: '唯爱摄影', style: '韩式唯美', packageType: '旅拍套餐', price: 18800, shootDate: '2024-09-15', contracted: false, contractPrice: 0 }
 ]
 
 export const mockTeam: TeamMember[] = [
@@ -228,9 +234,9 @@ export const mockPackages: PhotographyPackage[] = [
 ]
 
 export const mockDress: Dress[] = [
-  { id: '1', type: '主纱', category: '主纱', style: '宫廷风拖尾', size: 'S', price: 8800, fittingDate: '2024-09-20', image: 'https://images.unsplash.com/photo-1595777457583-95e059d581b8?w=800', name: '维多利亚女王', brand: 'Pronovias', color: '象牙白' },
-  { id: '2', type: '出门纱', category: '出门纱', style: '简约齐地', size: 'S', price: 3800, fittingDate: '2024-09-20', image: 'https://images.unsplash.com/photo-1519741497674-611481863552?w=800', name: '简约优雅', brand: 'Vera Wang', color: '纯白色' },
-  { id: '3', type: '敬酒服', category: '敬酒服', style: '中式红旗袍', size: 'M', price: 4200, fittingDate: '2024-09-25', image: 'https://images.unsplash.com/photo-1587239625499-81c5f8717a6b?w=800', name: '东方佳人', brand: '定制', color: '中国红' }
+  { id: '1', type: '主纱', category: '主纱', style: '宫廷风拖尾', size: 'S', price: 8800, fittingDate: '2024-09-20', image: 'https://images.unsplash.com/photo-1595777457583-95e059d581b8?w=800', name: '维多利亚女王', brand: 'Pronovias', color: '象牙白', contracted: true, contractPrice: 8800 },
+  { id: '2', type: '出门纱', category: '出门纱', style: '简约齐地', size: 'S', price: 3800, fittingDate: '2024-09-20', image: 'https://images.unsplash.com/photo-1519741497674-611481863552?w=800', name: '简约优雅', brand: 'Vera Wang', color: '纯白色', contracted: true, contractPrice: 3800 },
+  { id: '3', type: '敬酒服', category: '敬酒服', style: '中式红旗袍', size: 'M', price: 4200, fittingDate: '2024-09-25', image: 'https://images.unsplash.com/photo-1587239625499-81c5f8717a6b?w=800', name: '东方佳人', brand: '定制', color: '中国红', contracted: true, contractPrice: 4200 }
 ]
 
 export const mockSchedule: ScheduleItem[] = [

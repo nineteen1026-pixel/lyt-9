@@ -2,6 +2,7 @@ import { defineStore } from 'pinia'
 import { ref, watch, computed } from 'vue'
 import { get, set } from '../utils/storage'
 import { mockVenues, type Venue, type VenueStatus } from '../data/mockData'
+import { useBudgetStore } from './budget'
 
 export { type Venue, type VenueStatus }
 
@@ -17,7 +18,9 @@ export const useVenuesStore = defineStore('venues', () => {
   function addVenue(venue: Omit<Venue, 'id'>) {
     const newVenue: Venue = {
       ...venue,
-      id: Date.now().toString()
+      id: Date.now().toString(),
+      contracted: venue.contracted ?? false,
+      contractPrice: venue.contractPrice ?? 0
     }
     venues.value.push(newVenue)
   }
@@ -29,10 +32,47 @@ export const useVenuesStore = defineStore('venues', () => {
     }
   }
 
+  function updateContractVenue(id: string, contractPrice: number) {
+    const budgetStore = useBudgetStore()
+    const index = venues.value.findIndex(venue => venue.id === id)
+    if (index !== -1) {
+      venues.value[index].contracted = true
+      venues.value[index].contractPrice = contractPrice
+      venues.value[index].status = 'booked'
+      
+      const totalContracted = venues.value
+        .filter(v => v.contracted)
+        .reduce((sum, v) => sum + v.contractPrice, 0)
+      
+      budgetStore.updateActualByCategory('场地', totalContracted)
+    }
+  }
+
+  function cancelContractVenue(id: string) {
+    const budgetStore = useBudgetStore()
+    const index = venues.value.findIndex(venue => venue.id === id)
+    if (index !== -1) {
+      venues.value[index].contracted = false
+      venues.value[index].contractPrice = 0
+      
+      const totalContracted = venues.value
+        .filter(v => v.contracted)
+        .reduce((sum, v) => sum + v.contractPrice, 0)
+      
+      budgetStore.updateActualByCategory('场地', totalContracted)
+    }
+  }
+
   function deleteVenue(id: string) {
+    const budgetStore = useBudgetStore()
     const index = venues.value.findIndex(venue => venue.id === id)
     if (index !== -1) {
       venues.value.splice(index, 1)
+
+      const totalContracted = venues.value
+        .filter(v => v.contracted)
+        .reduce((sum, v) => sum + v.contractPrice, 0)
+      budgetStore.updateActualByCategory('场地', totalContracted)
     }
   }
 
@@ -47,6 +87,8 @@ export const useVenuesStore = defineStore('venues', () => {
     venues,
     addVenue,
     updateVenue,
+    updateContractVenue,
+    cancelContractVenue,
     deleteVenue,
     getVenueById,
     bookedVenues,

@@ -11,6 +11,7 @@ import {
   type PortfolioItem,
   type PhotographyPackage
 } from '../data/mockData'
+import { useBudgetStore } from './budget'
 
 export { type Photography, type TeamMember, type PortfolioItem, type PhotographyPackage }
 
@@ -29,7 +30,9 @@ export const usePhotographyStore = defineStore('photography', () => {
   function addItem(item: Omit<Photography, 'id'>) {
     const newItem: Photography = {
       ...item,
-      id: Date.now().toString()
+      id: Date.now().toString(),
+      contracted: item.contracted ?? false,
+      contractPrice: item.contractPrice ?? 0
     }
     items.value.push(newItem)
   }
@@ -41,10 +44,46 @@ export const usePhotographyStore = defineStore('photography', () => {
     }
   }
 
+  function updateContractItem(id: string, contractPrice: number) {
+    const budgetStore = useBudgetStore()
+    const index = items.value.findIndex(item => item.id === id)
+    if (index !== -1) {
+      items.value[index].contracted = true
+      items.value[index].contractPrice = contractPrice
+      
+      const totalContracted = items.value
+        .filter(p => p.contracted)
+        .reduce((sum, p) => sum + p.contractPrice, 0)
+      
+      budgetStore.updateActualByCategory('摄影', totalContracted)
+    }
+  }
+
+  function cancelContractItem(id: string) {
+    const budgetStore = useBudgetStore()
+    const index = items.value.findIndex(item => item.id === id)
+    if (index !== -1) {
+      items.value[index].contracted = false
+      items.value[index].contractPrice = 0
+      
+      const totalContracted = items.value
+        .filter(p => p.contracted)
+        .reduce((sum, p) => sum + p.contractPrice, 0)
+      
+      budgetStore.updateActualByCategory('摄影', totalContracted)
+    }
+  }
+
   function deleteItem(id: string) {
+    const budgetStore = useBudgetStore()
     const index = items.value.findIndex(item => item.id === id)
     if (index !== -1) {
       items.value.splice(index, 1)
+
+      const totalContracted = items.value
+        .filter(p => p.contracted)
+        .reduce((sum, p) => sum + p.contractPrice, 0)
+      budgetStore.updateActualByCategory('摄影', totalContracted)
     }
   }
 
@@ -59,6 +98,8 @@ export const usePhotographyStore = defineStore('photography', () => {
     packages,
     addItem,
     updateItem,
+    updateContractItem,
+    cancelContractItem,
     deleteItem,
     getItemById
   }

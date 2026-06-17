@@ -1,10 +1,14 @@
 <script setup lang="ts">
 import { ref } from 'vue'
 import { usePhotographyStore } from '@/stores/photography'
-import { Camera, Video, BookOpen, Gift, Check } from 'lucide-vue-next'
+import { Camera, Video, BookOpen, Gift, Check, X, FileSignature, CheckCircle, Calendar, Palette } from 'lucide-vue-next'
 
 const photographyStore = usePhotographyStore()
 const activeTab = ref(1)
+
+const showContractModal = ref(false)
+const selectedItemId = ref<string | null>(null)
+const contractPrice = ref(0)
 
 const formatPrice = (price: number) => {
   return `¥${price.toLocaleString()}`
@@ -20,6 +24,29 @@ const getAvatarColor = (name: string) => {
   const index = name.charCodeAt(0) % colors.length
   return colors[index]
 }
+
+const openContractModal = (itemId: string, currentPrice: number) => {
+  selectedItemId.value = itemId
+  contractPrice.value = currentPrice
+  showContractModal.value = true
+}
+
+const closeContractModal = () => {
+  showContractModal.value = false
+  selectedItemId.value = null
+  contractPrice.value = 0
+}
+
+const confirmContract = () => {
+  if (selectedItemId.value && contractPrice.value > 0) {
+    photographyStore.updateContractItem(selectedItemId.value, contractPrice.value)
+    closeContractModal()
+  }
+}
+
+const cancelContract = (itemId: string) => {
+  photographyStore.cancelContractItem(itemId)
+}
 </script>
 
 <template>
@@ -31,7 +58,65 @@ const getAvatarColor = (name: string) => {
       </div>
 
       <div class="px-4 -mt-10">
-        <div class="animate-slide-up bg-white rounded-2xl p-5 shadow-md mb-6" style="animation-delay: 0.1s">
+        <div class="animate-slide-up mb-6" style="animation-delay: 0.1s">
+          <h2 class="text-lg font-bold text-gray-800 mb-4">摄影团队选择</h2>
+          <div class="space-y-4">
+            <div 
+              v-for="(item, index) in photographyStore.items" 
+              :key="item.id"
+              class="bg-white rounded-2xl p-5 shadow-md hover:shadow-xl transition-all duration-300"
+              :style="{ animationDelay: `${0.2 + index * 0.1}s` }"
+            >
+              <div class="flex items-start justify-between mb-4">
+                <div>
+                  <h3 class="font-bold text-gray-800 text-lg">{{ item.teamName }}</h3>
+                  <p class="text-sm text-gray-500 mt-1">{{ item.packageType }}</p>
+                </div>
+                <div class="text-right">
+                  <p class="text-xl font-bold text-primary-500">{{ formatPrice(item.price) }}</p>
+                </div>
+              </div>
+              
+              <div class="flex flex-wrap gap-3 mb-4">
+                <div class="flex items-center gap-1.5 text-sm text-gray-600 bg-primary-50 px-3 py-1.5 rounded-full">
+                  <Palette class="w-4 h-4 text-primary-400" />
+                  <span>{{ item.style }}</span>
+                </div>
+                <div class="flex items-center gap-1.5 text-sm text-gray-600 bg-champagne-50 px-3 py-1.5 rounded-full">
+                  <Calendar class="w-4 h-4 text-champagne-300" />
+                  <span>{{ item.shootDate }}</span>
+                </div>
+              </div>
+
+              <div v-if="item.contracted" class="flex items-center justify-between gap-2 p-3 bg-green-50 rounded-xl">
+                <div class="flex items-center gap-2">
+                  <CheckCircle class="w-5 h-5 text-green-500" />
+                  <div>
+                    <span class="text-sm text-green-600 font-medium">已签约</span>
+                    <p class="text-xs text-green-500">签约金额: {{ formatPrice(item.contractPrice) }}</p>
+                  </div>
+                </div>
+                <button 
+                  @click="cancelContract(item.id)"
+                  class="px-3 py-1.5 text-xs bg-white text-red-500 rounded-lg border border-red-200 hover:bg-red-50 transition-colors"
+                >
+                  取消签约
+                </button>
+              </div>
+
+              <button 
+                v-else
+                @click="openContractModal(item.id, item.price)"
+                class="w-full py-3 bg-gradient-to-r from-primary-400 to-primary-500 text-white rounded-xl font-medium flex items-center justify-center gap-2 hover:shadow-lg transition-all duration-300"
+              >
+                <FileSignature class="w-5 h-5" />
+                立即签约
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <div class="animate-slide-up bg-white rounded-2xl p-5 shadow-md mb-6" style="animation-delay: 0.5s">
           <h2 class="text-lg font-bold text-gray-800 mb-4">团队介绍</h2>
           <div class="grid grid-cols-2 gap-3">
             <div 
@@ -153,6 +238,59 @@ const getAvatarColor = (name: string) => {
           </div>
         </div>
       </div>
+
+      <Teleport to="body">
+        <div v-if="showContractModal" class="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div class="absolute inset-0 bg-black/50 backdrop-blur-sm" @click="closeContractModal"></div>
+          <div class="relative bg-white rounded-3xl p-6 w-full max-w-md animate-fade-in shadow-2xl">
+            <button 
+              @click="closeContractModal"
+              class="absolute top-4 right-4 w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center hover:bg-gray-200 transition-colors"
+            >
+              <X class="w-5 h-5 text-gray-500" />
+            </button>
+            
+            <div class="text-center mb-6">
+              <div class="w-16 h-16 rounded-full bg-primary-100 flex items-center justify-center mx-auto mb-4">
+                <FileSignature class="w-8 h-8 text-primary-500" />
+              </div>
+              <h3 class="text-xl font-bold text-gray-800">摄影签约</h3>
+              <p class="text-sm text-gray-500 mt-1">请确认签约金额</p>
+            </div>
+
+            <div class="space-y-4">
+              <div>
+                <label class="block text-sm font-medium text-gray-700 mb-2">签约金额</label>
+                <div class="relative">
+                  <span class="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500 font-medium">¥</span>
+                  <input 
+                    v-model.number="contractPrice"
+                    type="number"
+                    class="w-full pl-10 pr-4 py-3 border-2 border-gray-200 rounded-xl focus:border-primary-400 focus:outline-none transition-colors text-lg font-medium"
+                    placeholder="请输入签约金额"
+                  />
+                </div>
+              </div>
+
+              <div class="flex gap-3 pt-4">
+                <button 
+                  @click="closeContractModal"
+                  class="flex-1 py-3 border-2 border-gray-200 text-gray-600 rounded-xl font-medium hover:bg-gray-50 transition-colors"
+                >
+                  取消
+                </button>
+                <button 
+                  @click="confirmContract"
+                  :disabled="contractPrice <= 0"
+                  class="flex-1 py-3 bg-gradient-to-r from-primary-400 to-primary-500 text-white rounded-xl font-medium hover:shadow-lg transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  确认签约
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </Teleport>
     </div>
   </div>
 </template>

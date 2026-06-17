@@ -25,8 +25,12 @@ const pieData = computed(() =>
 
 const getDifferenceClass = (diff: number) => {
   if (diff > 0) return 'text-green-500'
-  if (diff < 0) return 'text-primary-500'
+  if (diff < 0) return 'text-red-500'
   return 'text-gray-500'
+}
+
+const isOverBudget = (budget: number, actual: number) => {
+  return actual > budget
 }
 
 const getDifferenceIcon = (diff: number) => {
@@ -106,6 +110,7 @@ const getDifferenceIcon = (diff: number) => {
               v-for="(item, index) in budgetStore.items" 
               :key="item.id"
               class="bg-white rounded-xl p-4 shadow-sm hover:shadow-md transition-all duration-300"
+              :class="{ 'ring-2 ring-red-400 bg-red-50': isOverBudget(item.budget, item.actual) }"
               :style="{ animationDelay: `${0.8 + index * 0.1}s` }"
             >
               <div class="flex items-center justify-between">
@@ -117,12 +122,12 @@ const getDifferenceIcon = (diff: number) => {
                     <div class="w-3 h-3 rounded-full" :style="{ backgroundColor: item.color }"></div>
                   </div>
                   <div>
-                    <p class="font-medium text-gray-800">{{ item.category }}</p>
-                    <p class="text-xs text-gray-400">预算: {{ formatCurrency(item.budget) }}</p>
+                    <p class="font-medium" :class="isOverBudget(item.budget, item.actual) ? 'text-red-600' : 'text-gray-800'">{{ item.category }}</p>
+                    <p class="text-xs" :class="isOverBudget(item.budget, item.actual) ? 'text-red-400' : 'text-gray-400'">预算: {{ formatCurrency(item.budget) }}</p>
                   </div>
                 </div>
                 <div class="text-right">
-                  <p class="font-medium text-gray-800">{{ formatCurrency(item.actual) }}</p>
+                  <p class="font-medium" :class="isOverBudget(item.budget, item.actual) ? 'text-red-600' : 'text-gray-800'">{{ formatCurrency(item.actual) }}</p>
                   <div class="flex items-center justify-end gap-1">
                     <component 
                       :is="getDifferenceIcon(item.budget - item.actual)" 
@@ -130,10 +135,11 @@ const getDifferenceIcon = (diff: number) => {
                       :class="getDifferenceClass(item.budget - item.actual)"
                     />
                     <span 
-                      class="text-xs"
+                      class="text-xs font-medium"
                       :class="getDifferenceClass(item.budget - item.actual)"
                     >
                       {{ item.budget - item.actual > 0 ? '+' : '' }}{{ formatCurrency(item.budget - item.actual) }}
+                      <span v-if="isOverBudget(item.budget, item.actual)" class="ml-1">(超支)</span>
                     </span>
                   </div>
                 </div>

@@ -1,8 +1,13 @@
 <script setup lang="ts">
+import { ref } from 'vue'
 import { useVenuesStore, type VenueStatus } from '@/stores/venues'
-import { MapPin, Users, Tag, CheckCircle, Star } from 'lucide-vue-next'
+import { MapPin, Users, Tag, CheckCircle, Star, X, FileSignature } from 'lucide-vue-next'
 
 const venuesStore = useVenuesStore()
+
+const showContractModal = ref(false)
+const selectedVenueId = ref<string | null>(null)
+const contractPrice = ref(0)
 
 const getStatusConfig = (status: VenueStatus) => {
   switch (status) {
@@ -15,6 +20,29 @@ const getStatusConfig = (status: VenueStatus) => {
 
 const formatPrice = (price: number) => {
   return `¥${price.toLocaleString()}`
+}
+
+const openContractModal = (venueId: string, currentPrice: number) => {
+  selectedVenueId.value = venueId
+  contractPrice.value = currentPrice
+  showContractModal.value = true
+}
+
+const closeContractModal = () => {
+  showContractModal.value = false
+  selectedVenueId.value = null
+  contractPrice.value = 0
+}
+
+const confirmContract = () => {
+  if (selectedVenueId.value && contractPrice.value > 0) {
+    venuesStore.updateContractVenue(selectedVenueId.value, contractPrice.value)
+    closeContractModal()
+  }
+}
+
+const cancelContract = (venueId: string) => {
+  venuesStore.cancelContractVenue(venueId)
 }
 </script>
 
@@ -81,19 +109,92 @@ const formatPrice = (price: number) => {
                 </span>
               </div>
 
-              <div v-if="venue.status === 'booked'" class="mt-4 flex items-center gap-2 p-3 bg-green-50 rounded-xl">
-                <CheckCircle class="w-5 h-5 text-green-500" />
-                <span class="text-sm text-green-600 font-medium">已选择此场地举办婚礼</span>
+              <div v-if="venue.contracted" class="mt-4 flex items-center justify-between gap-2 p-3 bg-green-50 rounded-xl">
+                <div class="flex items-center gap-2">
+                  <CheckCircle class="w-5 h-5 text-green-500" />
+                  <div>
+                    <span class="text-sm text-green-600 font-medium">已签约</span>
+                    <p class="text-xs text-green-500">签约金额: {{ formatPrice(venue.contractPrice) }}</p>
+                  </div>
+                </div>
+                <button 
+                  @click="cancelContract(venue.id)"
+                  class="px-3 py-1.5 text-xs bg-white text-red-500 rounded-lg border border-red-200 hover:bg-red-50 transition-colors"
+                >
+                  取消签约
+                </button>
               </div>
 
-              <div v-else class="mt-4 flex items-center gap-2 p-3 bg-champagne-100 rounded-xl">
-                <Star class="w-5 h-5 text-champagne-300" />
-                <span class="text-sm text-champagne-300 font-medium">备选场地，可进一步了解</span>
+              <div v-else class="mt-4">
+                <div class="flex items-center gap-2 p-3 bg-champagne-100 rounded-xl mb-3">
+                  <Star class="w-5 h-5 text-champagne-300" />
+                  <span class="text-sm text-champagne-300 font-medium">备选场地，可签约预订</span>
+                </div>
+                <button 
+                  @click="openContractModal(venue.id, venue.price)"
+                  class="w-full py-3 bg-gradient-to-r from-primary-400 to-primary-500 text-white rounded-xl font-medium flex items-center justify-center gap-2 hover:shadow-lg transition-all duration-300"
+                >
+                  <FileSignature class="w-5 h-5" />
+                  立即签约
+                </button>
               </div>
             </div>
           </div>
         </div>
       </div>
+
+      <Teleport to="body">
+        <div v-if="showContractModal" class="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div class="absolute inset-0 bg-black/50 backdrop-blur-sm" @click="closeContractModal"></div>
+          <div class="relative bg-white rounded-3xl p-6 w-full max-w-md animate-fade-in shadow-2xl">
+            <button 
+              @click="closeContractModal"
+              class="absolute top-4 right-4 w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center hover:bg-gray-200 transition-colors"
+            >
+              <X class="w-5 h-5 text-gray-500" />
+            </button>
+            
+            <div class="text-center mb-6">
+              <div class="w-16 h-16 rounded-full bg-primary-100 flex items-center justify-center mx-auto mb-4">
+                <FileSignature class="w-8 h-8 text-primary-500" />
+              </div>
+              <h3 class="text-xl font-bold text-gray-800">场地签约</h3>
+              <p class="text-sm text-gray-500 mt-1">请确认签约金额</p>
+            </div>
+
+            <div class="space-y-4">
+              <div>
+                <label class="block text-sm font-medium text-gray-700 mb-2">签约金额</label>
+                <div class="relative">
+                  <span class="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500 font-medium">¥</span>
+                  <input 
+                    v-model.number="contractPrice"
+                    type="number"
+                    class="w-full pl-10 pr-4 py-3 border-2 border-gray-200 rounded-xl focus:border-primary-400 focus:outline-none transition-colors text-lg font-medium"
+                    placeholder="请输入签约金额"
+                  />
+                </div>
+              </div>
+
+              <div class="flex gap-3 pt-4">
+                <button 
+                  @click="closeContractModal"
+                  class="flex-1 py-3 border-2 border-gray-200 text-gray-600 rounded-xl font-medium hover:bg-gray-50 transition-colors"
+                >
+                  取消
+                </button>
+                <button 
+                  @click="confirmContract"
+                  :disabled="contractPrice <= 0"
+                  class="flex-1 py-3 bg-gradient-to-r from-primary-400 to-primary-500 text-white rounded-xl font-medium hover:shadow-lg transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  确认签约
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </Teleport>
     </div>
   </div>
 </template>

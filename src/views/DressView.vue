@@ -1,10 +1,14 @@
 <script setup lang="ts">
 import { ref, computed } from 'vue'
 import { useDressStore, type DressCategory } from '@/stores/dress'
-import { Shirt, Ruler, Clock, ChevronRight, Tag, Palette } from 'lucide-vue-next'
+import { Shirt, Ruler, Clock, ChevronRight, Tag, Palette, X, FileSignature, CheckCircle } from 'lucide-vue-next'
 
 const dressStore = useDressStore()
 const activeCategory = ref<DressCategory>('主纱')
+
+const showContractModal = ref(false)
+const selectedDressId = ref<string | null>(null)
+const contractPrice = ref(0)
 
 const categories: { key: DressCategory; label: string }[] = [
   { key: '主纱', label: '主纱' },
@@ -18,6 +22,29 @@ const filteredDresses = computed(() => {
 
 const formatPrice = (price: number) => {
   return `¥${price.toLocaleString()}`
+}
+
+const openContractModal = (dressId: string, currentPrice: number) => {
+  selectedDressId.value = dressId
+  contractPrice.value = currentPrice
+  showContractModal.value = true
+}
+
+const closeContractModal = () => {
+  showContractModal.value = false
+  selectedDressId.value = null
+  contractPrice.value = 0
+}
+
+const confirmContract = () => {
+  if (selectedDressId.value && contractPrice.value > 0) {
+    dressStore.updateContractDress(selectedDressId.value, contractPrice.value)
+    closeContractModal()
+  }
+}
+
+const cancelContract = (dressId: string) => {
+  dressStore.cancelContractDress(dressId)
 }
 </script>
 
@@ -76,6 +103,31 @@ const formatPrice = (price: number) => {
                   <span>{{ dress.fittingDate }}</span>
                 </div>
               </div>
+
+              <div v-if="dress.contracted" class="flex items-center justify-between gap-2 p-3 bg-green-50 rounded-xl">
+                <div class="flex items-center gap-2">
+                  <CheckCircle class="w-5 h-5 text-green-500" />
+                  <div>
+                    <span class="text-sm text-green-600 font-medium">已签约</span>
+                    <p class="text-xs text-green-500">签约金额: {{ formatPrice(dress.contractPrice) }}</p>
+                  </div>
+                </div>
+                <button 
+                  @click="cancelContract(dress.id)"
+                  class="px-3 py-1.5 text-xs bg-white text-red-500 rounded-lg border border-red-200 hover:bg-red-50 transition-colors"
+                >
+                  取消签约
+                </button>
+              </div>
+
+              <button 
+                v-else
+                @click="openContractModal(dress.id, dress.price)"
+                class="w-full py-3 bg-gradient-to-r from-primary-400 to-primary-500 text-white rounded-xl font-medium flex items-center justify-center gap-2 hover:shadow-lg transition-all duration-300"
+              >
+                <FileSignature class="w-5 h-5" />
+                立即签约
+              </button>
             </div>
           </div>
         </div>
@@ -147,6 +199,59 @@ const formatPrice = (price: number) => {
           </div>
         </div>
       </div>
+
+      <Teleport to="body">
+        <div v-if="showContractModal" class="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div class="absolute inset-0 bg-black/50 backdrop-blur-sm" @click="closeContractModal"></div>
+          <div class="relative bg-white rounded-3xl p-6 w-full max-w-md animate-fade-in shadow-2xl">
+            <button 
+              @click="closeContractModal"
+              class="absolute top-4 right-4 w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center hover:bg-gray-200 transition-colors"
+            >
+              <X class="w-5 h-5 text-gray-500" />
+            </button>
+            
+            <div class="text-center mb-6">
+              <div class="w-16 h-16 rounded-full bg-primary-100 flex items-center justify-center mx-auto mb-4">
+                <FileSignature class="w-8 h-8 text-primary-500" />
+              </div>
+              <h3 class="text-xl font-bold text-gray-800">婚纱签约</h3>
+              <p class="text-sm text-gray-500 mt-1">请确认签约金额</p>
+            </div>
+
+            <div class="space-y-4">
+              <div>
+                <label class="block text-sm font-medium text-gray-700 mb-2">签约金额</label>
+                <div class="relative">
+                  <span class="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500 font-medium">¥</span>
+                  <input 
+                    v-model.number="contractPrice"
+                    type="number"
+                    class="w-full pl-10 pr-4 py-3 border-2 border-gray-200 rounded-xl focus:border-primary-400 focus:outline-none transition-colors text-lg font-medium"
+                    placeholder="请输入签约金额"
+                  />
+                </div>
+              </div>
+
+              <div class="flex gap-3 pt-4">
+                <button 
+                  @click="closeContractModal"
+                  class="flex-1 py-3 border-2 border-gray-200 text-gray-600 rounded-xl font-medium hover:bg-gray-50 transition-colors"
+                >
+                  取消
+                </button>
+                <button 
+                  @click="confirmContract"
+                  :disabled="contractPrice <= 0"
+                  class="flex-1 py-3 bg-gradient-to-r from-primary-400 to-primary-500 text-white rounded-xl font-medium hover:shadow-lg transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  确认签约
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </Teleport>
     </div>
   </div>
 </template>
