@@ -1,12 +1,10 @@
 <script setup lang="ts">
-import { ref, onMounted, computed } from 'vue'
-import * as echarts from 'echarts'
+import { computed } from 'vue'
 import { useBudgetStore } from '@/stores/budget'
+import PieChart from '@/components/PieChart.vue'
 import { Wallet, TrendingDown, TrendingUp, Target } from 'lucide-vue-next'
 
 const budgetStore = useBudgetStore()
-const chartRef = ref<HTMLDivElement | null>(null)
-let chartInstance: echarts.ECharts | null = null
 
 const formatCurrency = (value: number) => {
   return `¥${value.toLocaleString()}`
@@ -17,65 +15,13 @@ const totalSpent = computed(() => budgetStore.items.reduce((sum, item) => sum + 
 const remaining = computed(() => totalBudget.value - totalSpent.value)
 const progress = computed(() => Math.min((totalSpent.value / totalBudget.value) * 100, 100))
 
-const initChart = () => {
-  if (!chartRef.value) return
-  
-  chartInstance = echarts.init(chartRef.value)
-  
-  const option = {
-    tooltip: {
-      trigger: 'item',
-      formatter: '{b}: ¥{c} ({d}%)'
-    },
-    legend: {
-      orient: 'vertical',
-      right: '5%',
-      top: 'center',
-      textStyle: {
-        color: '#666',
-        fontSize: 12
-      },
-      itemGap: 12
-    },
-    series: [
-      {
-        type: 'pie',
-        radius: ['40%', '70%'],
-        center: ['35%', '50%'],
-        avoidLabelOverlap: false,
-        itemStyle: {
-          borderRadius: 8,
-          borderColor: '#fff',
-          borderWidth: 2
-        },
-        label: {
-          show: false
-        },
-        emphasis: {
-          label: {
-            show: true,
-            fontSize: 14,
-            fontWeight: 'bold'
-          }
-        },
-        data: budgetStore.items.map(item => ({
-          value: item.actual,
-          name: item.category,
-          itemStyle: { color: item.color }
-        }))
-      }
-    ]
-  }
-  
-  chartInstance.setOption(option)
-}
-
-onMounted(() => {
-  initChart()
-  window.addEventListener('resize', () => {
-    chartInstance?.resize()
-  })
-})
+const pieData = computed(() =>
+  budgetStore.items.map(item => ({
+    name: item.category,
+    value: item.actual,
+    color: item.color
+  }))
+)
 
 const getDifferenceClass = (diff: number) => {
   if (diff > 0) return 'text-green-500'
@@ -150,7 +96,7 @@ const getDifferenceIcon = (diff: number) => {
 
         <div class="animate-slide-up bg-white rounded-2xl p-4 shadow-md mb-6" style="animation-delay: 0.6s">
           <h2 class="text-lg font-bold text-gray-800 mb-4">支出分布</h2>
-          <div ref="chartRef" class="w-full h-64"></div>
+          <PieChart :data="pieData" class="w-full h-64" />
         </div>
 
         <div class="animate-slide-up" style="animation-delay: 0.7s">

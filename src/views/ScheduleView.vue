@@ -1,31 +1,12 @@
 <script setup lang="ts">
-import { ref, computed } from 'vue'
+import { computed } from 'vue'
 import { useScheduleStore } from '@/stores/schedule'
-import { Calendar, Clock, MapPin, User, Sun, Moon, Sparkles, Car, Camera, Heart, Coffee, Building, Users, Mic, Wine, Hand, Image, Shirt, Utensils, Home } from 'lucide-vue-next'
+import Timeline from '@/components/Timeline.vue'
+import { Calendar } from 'lucide-vue-next'
+import { storeToRefs } from 'pinia'
 
 const scheduleStore = useScheduleStore()
-const selectedDate = ref(scheduleStore.weddingDate)
-
-const iconMap: Record<string, typeof Sun> = {
-  sun: Sun,
-  moon: Moon,
-  sparkles: Sparkles,
-  car: Car,
-  camera: Camera,
-  heart: Heart,
-  coffee: Coffee,
-  'map-pin': MapPin,
-  building: Building,
-  users: Users,
-  rings: Heart,
-  mic: Mic,
-  wine: Wine,
-  hand: Hand,
-  image: Image,
-  shirt: Shirt,
-  utensils: Utensils,
-  home: Home,
-}
+const { weddingDate, items } = storeToRefs(scheduleStore)
 
 const formatDate = (dateStr: string) => {
   const date = new Date(dateStr)
@@ -42,7 +23,7 @@ const getTimePeriod = (time: string) => {
 
 const groupedSchedule = computed(() => {
   const groups: Record<string, typeof scheduleStore.items> = {}
-  scheduleStore.items.forEach(item => {
+  items.value.forEach(item => {
     const period = getTimePeriod(item.time)
     if (!groups[period]) {
       groups[period] = []
@@ -51,6 +32,11 @@ const groupedSchedule = computed(() => {
   })
   return groups
 })
+
+const handleDateChange = (e: Event) => {
+  const target = e.target as HTMLInputElement
+  scheduleStore.setWeddingDate(target.value)
+}
 </script>
 
 <template>
@@ -69,12 +55,13 @@ const groupedSchedule = computed(() => {
             </div>
             <div>
               <p class="text-sm text-gray-500">婚礼日期</p>
-              <p class="text-lg font-bold text-gray-800">{{ formatDate(selectedDate) }}</p>
+              <p class="text-lg font-bold text-gray-800">{{ formatDate(weddingDate) }}</p>
             </div>
           </div>
-          <input 
-            v-model="selectedDate"
-            type="date" 
+          <input
+            :value="weddingDate"
+            @input="handleDateChange"
+            type="date"
             class="w-full p-3 bg-primary-50 rounded-xl text-gray-700 outline-none focus:ring-2 focus:ring-primary-300 transition-all"
           />
         </div>
@@ -87,42 +74,7 @@ const groupedSchedule = computed(() => {
               <div class="h-px flex-1 bg-gradient-to-r from-transparent via-primary-200 to-transparent"></div>
             </div>
 
-            <div class="relative">
-              <div class="absolute left-5 top-2 bottom-2 w-0.5 bg-gradient-to-b from-primary-300 to-primary-100"></div>
-              
-              <div class="space-y-4">
-                <div 
-                  v-for="(item, index) in items" 
-                  :key="item.id"
-                  class="animate-slide-up relative pl-12"
-                  :style="{ animationDelay: `${0.3 + index * 0.1}s` }"
-                >
-                  <div class="absolute left-2 top-2 w-6 h-6 rounded-full bg-primary-500 flex items-center justify-center shadow-lg">
-                    <Clock class="w-3 h-3 text-white" />
-                  </div>
-                  
-                  <div class="bg-white rounded-xl p-4 shadow-sm hover:shadow-md transition-all duration-300">
-                    <div class="flex items-center justify-between mb-2">
-                      <span class="text-lg font-bold text-primary-500">{{ item.time }}</span>
-                    </div>
-                    
-                    <h3 class="font-medium text-gray-800 mb-2">{{ item.title }}</h3>
-                    <p class="text-sm text-gray-500 mb-3">{{ item.description }}</p>
-                    
-                    <div class="space-y-1.5">
-                      <div class="flex items-center gap-2 text-sm text-gray-500">
-                        <MapPin class="w-4 h-4 text-champagne-300 flex-shrink-0" />
-                        <span>{{ item.location }}</span>
-                      </div>
-                      <div class="flex items-center gap-2 text-sm text-gray-500">
-                        <User class="w-4 h-4 text-primary-400 flex-shrink-0" />
-                        <span>{{ item.personInCharge }}</span>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
+            <Timeline :items="items" />
           </div>
         </div>
       </div>

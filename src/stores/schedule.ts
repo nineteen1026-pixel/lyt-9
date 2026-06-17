@@ -7,13 +7,22 @@ export { type ScheduleItem }
 
 export const useScheduleStore = defineStore('schedule', () => {
   const STORAGE_KEY = 'wedding-schedule'
+  const DATE_STORAGE_KEY = 'wedding-date'
 
   const items = ref<ScheduleItem[]>(get(STORAGE_KEY, mockSchedule))
-  const weddingDate = ref(mockWeddingDate)
+  const weddingDate = ref<string>(get(DATE_STORAGE_KEY, mockWeddingDate))
 
   watch(items, (newValue) => {
     set(STORAGE_KEY, newValue)
   }, { deep: true })
+
+  watch(weddingDate, (newValue) => {
+    set(DATE_STORAGE_KEY, newValue)
+  })
+
+  function setWeddingDate(date: string) {
+    weddingDate.value = date
+  }
 
   function addItem(item: Omit<ScheduleItem, 'id'>) {
     const newItem: ScheduleItem = {
@@ -46,6 +55,7 @@ export const useScheduleStore = defineStore('schedule', () => {
   return {
     items,
     weddingDate,
+    setWeddingDate,
     addItem,
     updateItem,
     deleteItem,
