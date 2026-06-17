@@ -21,16 +21,31 @@ const getTimePeriod = (time: string) => {
   return '晚上'
 }
 
-const groupedSchedule = computed(() => {
-  const groups: Record<string, typeof scheduleStore.items> = {}
-  items.value.forEach(item => {
+const PERIOD_ORDER = ['上午', '下午', '晚上']
+type TimelineItem =
+  | { type: 'separator'; label: string }
+  | { type: 'event'; time: string; title: string; description: string; location?: string; personInCharge?: string }
+
+const flatTimeline = computed<TimelineItem[]>(() => {
+  const sorted = [...items.value].sort((a, b) => a.time.localeCompare(b.time))
+
+  const groups: Record<string, typeof sorted> = {}
+  sorted.forEach(item => {
     const period = getTimePeriod(item.time)
-    if (!groups[period]) {
-      groups[period] = []
-    }
+    if (!groups[period]) groups[period] = []
     groups[period].push(item)
   })
-  return groups
+
+  const result: TimelineItem[] = []
+  PERIOD_ORDER.forEach(period => {
+    if (groups[period] && groups[period].length > 0) {
+      result.push({ type: 'separator', label: period })
+      groups[period].forEach(item => {
+        result.push({ type: 'event', ...item })
+      })
+    }
+  })
+  return result
 })
 
 const handleDateChange = (e: Event) => {
@@ -66,17 +81,7 @@ const handleDateChange = (e: Event) => {
           />
         </div>
 
-        <div class="space-y-6">
-          <div v-for="(items, period) in groupedSchedule" :key="period">
-            <div class="animate-slide-up flex items-center gap-2 mb-3" style="animation-delay: 0.2s">
-              <div class="h-px flex-1 bg-gradient-to-r from-transparent via-primary-200 to-transparent"></div>
-              <span class="px-4 py-1 bg-primary-100 text-primary-500 rounded-full text-sm font-medium">{{ period }}</span>
-              <div class="h-px flex-1 bg-gradient-to-r from-transparent via-primary-200 to-transparent"></div>
-            </div>
-
-            <Timeline :items="items" />
-          </div>
-        </div>
+        <Timeline :items="flatTimeline" />
       </div>
     </div>
   </div>
