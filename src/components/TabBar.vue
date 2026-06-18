@@ -35,6 +35,7 @@
 <script setup lang="ts">
 import { useRoute, useRouter } from 'vue-router'
 import {
+  LayoutDashboard,
   PieChart,
   Users,
   Building2,
@@ -48,6 +49,7 @@ const route = useRoute()
 const router = useRouter()
 
 const tabs = [
+  { path: '/overview', label: '总览', icon: LayoutDashboard },
   { path: '/budget', label: '预算', icon: PieChart },
   { path: '/guests', label: '宾客', icon: Users },
   { path: '/venues', label: '场地', icon: Building2 },

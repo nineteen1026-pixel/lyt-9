@@ -1,4 +1,5 @@
 import { createRouter, createWebHistory, type RouteRecordRaw } from 'vue-router'
+import OverviewView from '@/views/OverviewView.vue'
 import BudgetView from '@/views/BudgetView.vue'
 import GuestsView from '@/views/GuestsView.vue'
 import VenuesView from '@/views/VenuesView.vue'
@@ -10,8 +11,13 @@ import RehearsalView from '@/views/RehearsalView.vue'
 const routes = [
   {
     path: '/',
-    redirect: '/budget'
+    redirect: '/overview'
   } as RouteRecordRaw,
+  {
+    path: '/overview',
+    name: 'overview',
+    component: OverviewView
+  },
   {
     path: '/budget',
     name: 'budget',
