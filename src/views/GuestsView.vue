@@ -1,9 +1,9 @@
 <script setup lang="ts">
 import { ref, computed, watch } from 'vue'
-import { useGuestsStore, type Guest, type GuestStatus, type GuestGroup } from '@/stores/guests'
+import { useGuestsStore, type Guest, type GuestStatus, type GuestGroup, type ImportDedupeMode } from '@/stores/guests'
 import {
   Search, Users, CheckCircle, Clock, XCircle, Utensils, Edit3, X, AlertTriangle, Info,
-  Upload, Download, FileSpreadsheet, ChevronDown, ChevronUp, Layers
+  Upload, Download, FileSpreadsheet, ChevronDown, ChevronUp, Layers, RefreshCw, SkipForward, Plus
 } from 'lucide-vue-next'
 import Toast from '@/components/Toast.vue'
 
@@ -19,6 +19,9 @@ const editingTableNumber = ref<number | null>(null)
 const showTableStats = ref(false)
 const isImporting = ref(false)
 const fileInputRef = ref<HTMLInputElement | null>(null)
+const pendingFile = ref<File | null>(null)
+const showDedupeModal = ref(false)
+const dedupeMode = ref<ImportDedupeMode>('skip')
 
 const toastVisible = ref(false)
 const toastMessage = ref('')
@@ -34,6 +37,12 @@ const showToast = (message: string, description?: string, type: 'success' | 'err
     toastVisible.value = false
   }, duration)
 }
+
+const dedupeOptions: { key: ImportDedupeMode; label: string; desc: string; icon: typeof Plus }[] = [
+  { key: 'skip', label: '跳过重复', desc: '按电话号码匹配，相同电话则跳过不导入', icon: SkipForward },
+  { key: 'overwrite', label: '覆盖更新', desc: '按电话号码匹配，相同电话则更新原有信息', icon: RefreshCw },
+  { key: 'append', label: '全部追加', desc: '不做去重，直接全部新增导入', icon: Plus },
+]
 
 const statusFilters: { key: GuestStatus | 'all'; label: string; icon: typeof Users }[] = [
   { key: 'all', label: '全部', icon: Users },
@@ -172,29 +181,56 @@ const handleImportClick = () => {
   fileInputRef.value?.click()
 }
 
-const handleFileChange = async (event: Event) => {
+const handleFileChange = (event: Event) => {
   const input = event.target as HTMLInputElement
   const file = input.files?.[0]
   if (!file) return
 
+  pendingFile.value = file
+  dedupeMode.value = 'skip'
+  showDedupeModal.value = true
+  input.value = ''
+}
+
+const closeDedupeModal = () => {
+  showDedupeModal.value = false
+  pendingFile.value = null
+}
+
+const executeImport = async () => {
+  const file = pendingFile.value
+  if (!file) return
+
   isImporting.value = true
+  showDedupeModal.value = false
   try {
-    const result = await guestsStore.importFromExcel(file)
-    if (result.failed > 0) {
-      showToast(
-        `导入完成：成功 ${result.success} 条，失败 ${result.failed} 条`,
-        result.errors.slice(0, 3).join('；') + (result.errors.length > 3 ? '...' : ''),
-        'warning',
-        5000
-      )
-    } else {
-      showToast('导入成功', `成功导入 ${result.success} 位宾客`, 'success')
-    }
+    const result = await guestsStore.importFromExcel(file, dedupeMode.value)
+    const parts: string[] = []
+    if (result.added > 0) parts.push(`新增 ${result.added}`)
+    if (result.updated > 0) parts.push(`更新 ${result.updated}`)
+    if (result.skipped > 0) parts.push(`跳过 ${result.skipped}`)
+    if (result.failed > 0) parts.push(`失败 ${result.failed}`)
+    const summary = parts.join('，') || '无数据'
+
+    const totalOK = result.added + result.updated + result.skipped
+    const type: 'success' | 'warning' | 'info' | 'error' =
+      result.failed > 0 ? 'warning' :
+        (result.added + result.updated > 0 ? 'success' : 'info')
+    const duration = result.failed > 0 ? 5000 : 3500
+
+    showToast(
+      `导入完成：${summary}`,
+      result.failed > 0
+        ? (result.errors.slice(0, 3).join('；') + (result.errors.length > 3 ? '...' : ''))
+        : (totalOK === 0 && result.failed === 0 ? '所有数据均已存在，已按策略跳过' : ''),
+      type,
+      duration
+    )
   } catch (err: any) {
     showToast('导入失败', err.message || '请检查文件格式', 'error', 4000)
   } finally {
     isImporting.value = false
-    input.value = ''
+    pendingFile.value = null
   }
 }
 </script>
@@ -507,6 +543,79 @@ const handleFileChange = async (event: Event) => {
                 保存
               </button>
             </div>
+          </div>
+        </div>
+      </div>
+    </Teleport>
+
+    <Teleport to="body">
+      <div v-if="showDedupeModal" class="fixed inset-0 z-50 flex items-center justify-center p-4">
+        <div class="absolute inset-0 bg-black/50 backdrop-blur-sm" @click="closeDedupeModal"></div>
+        <div class="relative bg-white rounded-3xl p-6 w-full max-w-md animate-fade-in shadow-2xl">
+          <button
+            @click="closeDedupeModal"
+            class="absolute top-4 right-4 w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center hover:bg-gray-200 transition-colors"
+          >
+            <X class="w-5 h-5 text-gray-500" />
+          </button>
+
+          <div class="text-center mb-6">
+            <div class="w-16 h-16 rounded-full bg-primary-100 flex items-center justify-center mx-auto mb-4">
+              <Upload class="w-8 h-8 text-primary-500" />
+            </div>
+            <h3 class="text-xl font-bold text-gray-800">选择导入策略</h3>
+            <p class="text-sm text-gray-500 mt-1">{{ pendingFile?.name }}</p>
+          </div>
+
+          <div class="space-y-3 mb-6">
+            <button
+              v-for="opt in dedupeOptions"
+              :key="opt.key"
+              @click="dedupeMode = opt.key"
+              class="w-full text-left p-4 rounded-2xl border-2 transition-all"
+              :class="dedupeMode === opt.key
+                ? 'border-primary-400 bg-primary-50 shadow-sm'
+                : 'border-gray-100 bg-white hover:border-gray-200'"
+            >
+              <div class="flex items-start gap-3">
+                <div
+                  class="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0"
+                  :class="dedupeMode === opt.key ? 'bg-primary-500 text-white' : 'bg-gray-100 text-gray-500'"
+                >
+                  <component :is="opt.icon" class="w-5 h-5" />
+                </div>
+                <div class="flex-1">
+                  <div class="flex items-center justify-between">
+                    <p class="font-semibold" :class="dedupeMode === opt.key ? 'text-primary-600' : 'text-gray-800'">
+                      {{ opt.label }}
+                    </p>
+                    <div
+                      class="w-5 h-5 rounded-full border-2 flex items-center justify-center"
+                      :class="dedupeMode === opt.key ? 'border-primary-500' : 'border-gray-300'"
+                    >
+                      <div v-if="dedupeMode === opt.key" class="w-2.5 h-2.5 rounded-full bg-primary-500"></div>
+                    </div>
+                  </div>
+                  <p class="text-xs text-gray-500 mt-1">{{ opt.desc }}</p>
+                </div>
+              </div>
+            </button>
+          </div>
+
+          <div class="flex gap-3">
+            <button
+              @click="closeDedupeModal"
+              class="flex-1 py-3 border-2 border-gray-200 text-gray-600 rounded-xl font-medium hover:bg-gray-50 transition-colors"
+            >
+              取消
+            </button>
+            <button
+              @click="executeImport"
+              :disabled="isImporting"
+              class="flex-1 py-3 bg-gradient-to-r from-primary-400 to-primary-500 text-white rounded-xl font-medium hover:shadow-lg transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:shadow-none"
+            >
+              {{ isImporting ? '导入中...' : '开始导入' }}
+            </button>
           </div>
         </div>
       </div>

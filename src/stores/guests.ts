@@ -13,8 +13,12 @@ export interface TableInfo {
   count: number
 }
 
+export type ImportDedupeMode = 'skip' | 'overwrite' | 'append'
+
 export interface ImportResult {
-  success: number
+  added: number
+  updated: number
+  skipped: number
   failed: number
   errors: string[]
 }
@@ -248,7 +252,61 @@ export const useGuestsStore = defineStore('guests', () => {
     }
   }
 
-  function importFromExcel(file: File): Promise<ImportResult> {
+  function findGuestByPhone(phone: string): Guest | undefined {
+    if (!phone) return undefined
+    return guests.value.find(g => g.phone === phone)
+  }
+
+  function validateTableAssignmentForImport(
+    currentAssignedCount: number,
+    currentGuestWasAssigned: boolean,
+    newTableNumber: number | null,
+    status: GuestStatus
+  ): { valid: boolean; message: string; finalTableNumber: number | null; newAssignedCount: number } {
+    let tableNumber = newTableNumber
+    if (status === 'declined') {
+      tableNumber = null
+    }
+
+    if (!hasBookedVenue.value && tableNumber !== null) {
+      return {
+        valid: false,
+        message: '尚未预订场地，请先预订场地后再进行分桌。',
+        finalTableNumber: null,
+        newAssignedCount: currentAssignedCount
+      }
+    }
+
+    const willBeAssigned = tableNumber !== null
+    let newAssignedCount = currentAssignedCount
+    if (!currentGuestWasAssigned && willBeAssigned) {
+      newAssignedCount = currentAssignedCount + 1
+    } else if (currentGuestWasAssigned && !willBeAssigned) {
+      newAssignedCount = currentAssignedCount - 1
+    }
+
+    const capacity = bookedVenueCapacity.value
+    const overflow = Math.max(0, newAssignedCount - capacity)
+
+    if (hasBookedVenue.value && overflow > 0) {
+      const venueNames = venuesStore.bookedVenues.map(v => v.name).join('、')
+      return {
+        valid: false,
+        message: `场地席位数不足！已预订场地「${venueNames}」总容量为${capacity}人，导入后将分配${newAssignedCount}人，超出${overflow}人。`,
+        finalTableNumber: null,
+        newAssignedCount: currentAssignedCount
+      }
+    }
+
+    return {
+      valid: true,
+      message: '',
+      finalTableNumber: tableNumber,
+      newAssignedCount
+    }
+  }
+
+  function importFromExcel(file: File, dedupeMode: ImportDedupeMode = 'skip'): Promise<ImportResult> {
     return new Promise((resolve, reject) => {
       const reader = new FileReader()
       reader.onload = (e) => {
@@ -260,10 +318,14 @@ export const useGuestsStore = defineStore('guests', () => {
           const rows = XLSX.utils.sheet_to_json<any>(worksheet)
 
           const result: ImportResult = {
-            success: 0,
+            added: 0,
+            updated: 0,
+            skipped: 0,
             failed: 0,
             errors: []
           }
+
+          let runningAssignedCount = assignedGuestsCount.value
 
           rows.forEach((row, index) => {
             const rowNum = index + 2
@@ -280,19 +342,72 @@ export const useGuestsStore = defineStore('guests', () => {
               const groupStr = String(row['分组'] ?? row['归属'] ?? row['group'] ?? 'both').trim()
               const group = parseGroup(groupStr)
               const tableRaw = row['桌号'] ?? row['桌次'] ?? row['tableNumber'] ?? row['table']
-              let tableNumber: number | null = null
+              let parsedTableNumber: number | null = null
               if (tableRaw !== undefined && tableRaw !== null && tableRaw !== '') {
                 const num = Number(tableRaw)
                 if (!isNaN(num) && num > 0) {
-                  tableNumber = Math.floor(num)
+                  parsedTableNumber = Math.floor(num)
                 }
               }
 
-              if (status === 'declined') {
-                tableNumber = null
+              const avatar = name.charAt(0)
+              const existingGuest = findGuestByPhone(phone)
+
+              if (existingGuest) {
+                if (dedupeMode === 'skip') {
+                  result.skipped++
+                  return
+                }
+
+                if (dedupeMode === 'overwrite') {
+                  const wasAssigned = existingGuest.tableNumber !== null && existingGuest.status !== 'declined'
+                  const validation = validateTableAssignmentForImport(
+                    runningAssignedCount,
+                    wasAssigned,
+                    parsedTableNumber,
+                    status
+                  )
+
+                  let finalTableNumber: number | null
+                  if (status === 'declined') {
+                    finalTableNumber = null
+                  } else if (!validation.valid && parsedTableNumber !== null) {
+                    throw new Error(`第${rowNum}行（${name}）：${validation.message}`)
+                  } else {
+                    finalTableNumber = validation.finalTableNumber
+                  }
+                  runningAssignedCount = validation.newAssignedCount
+
+                  updateGuest(existingGuest.id, {
+                    name,
+                    phone,
+                    group,
+                    status,
+                    attendance: parseAttendance(status),
+                    tableNumber: finalTableNumber,
+                    avatar
+                  })
+                  result.updated++
+                  return
+                }
               }
 
-              const avatar = name.charAt(0)
+              const validation = validateTableAssignmentForImport(
+                runningAssignedCount,
+                false,
+                parsedTableNumber,
+                status
+              )
+
+              let finalTableNumber: number | null
+              if (status === 'declined') {
+                finalTableNumber = null
+              } else if (!validation.valid && parsedTableNumber !== null) {
+                throw new Error(`第${rowNum}行（${name}）：${validation.message}`)
+              } else {
+                finalTableNumber = validation.finalTableNumber
+              }
+              runningAssignedCount = validation.newAssignedCount
 
               addGuest({
                 name,
@@ -300,11 +415,10 @@ export const useGuestsStore = defineStore('guests', () => {
                 group,
                 status,
                 attendance: parseAttendance(status),
-                tableNumber,
+                tableNumber: finalTableNumber,
                 avatar
               })
-
-              result.success++
+              result.added++
             } catch (err: any) {
               result.failed++
               result.errors.push(err.message || `第${rowNum}行：导入失败`)
@@ -327,8 +441,7 @@ export const useGuestsStore = defineStore('guests', () => {
       '电话': g.phone,
       '分组': g.group === 'groom' ? '男方' : g.group === 'bride' ? '女方' : '双方',
       '状态': g.status === 'confirmed' ? '已确认' : g.status === 'pending' ? '待确认' : '未出席',
-      '桌号': g.tableNumber ?? '',
-      '归属': g.group === 'groom' ? '男方' : g.group === 'bride' ? '女方' : '双方'
+      '桌号': g.tableNumber ?? ''
     }))
 
     const worksheet = XLSX.utils.json_to_sheet(exportData)
@@ -337,8 +450,7 @@ export const useGuestsStore = defineStore('guests', () => {
       { wch: 15 },
       { wch: 10 },
       { wch: 10 },
-      { wch: 8 },
-      { wch: 10 }
+      { wch: 8 }
     ]
     const workbook = XLSX.utils.book_new()
     XLSX.utils.book_append_sheet(workbook, worksheet, '宾客名单')
