@@ -4,7 +4,7 @@ import { useBudgetStore } from '@/stores/budget'
 import { useGuestsStore } from '@/stores/guests'
 import PieChart from '@/components/PieChart.vue'
 import Toast from '@/components/Toast.vue'
-import { Wallet, TrendingDown, TrendingUp, Target, AlertTriangle } from 'lucide-vue-next'
+import { Wallet, TrendingDown, TrendingUp, Target, AlertTriangle, Info } from 'lucide-vue-next'
 
 const budgetStore = useBudgetStore()
 const guestsStore = useGuestsStore()
@@ -12,11 +12,13 @@ const guestsStore = useGuestsStore()
 const toastVisible = ref(false)
 const toastMessage = ref('')
 const toastDescription = ref('')
+const toastType = ref<'success' | 'error' | 'warning' | 'info'>('warning')
 
 onMounted(() => {
   if (guestsStore.capacityWarning) {
     toastMessage.value = guestsStore.capacityWarning.title
     toastDescription.value = guestsStore.capacityWarning.content
+    toastType.value = guestsStore.hasBookedVenue ? 'warning' : 'info'
     toastVisible.value = true
     setTimeout(() => {
       toastVisible.value = false
@@ -68,14 +70,16 @@ const getDifferenceIcon = (diff: number) => {
       </div>
 
       <div class="px-4 -mt-10">
-        <div v-if="guestsStore.capacityWarning" class="animate-slide-up mb-4 bg-red-50 border-2 border-red-300 rounded-2xl p-4 shadow-md" style="animation-delay: 0.05s">
+        <div v-if="guestsStore.capacityWarning" class="animate-slide-up mb-4 rounded-2xl p-4 shadow-md" style="animation-delay: 0.05s"
+          :class="guestsStore.hasBookedVenue ? 'bg-red-50 border-2 border-red-300' : 'bg-yellow-50 border-2 border-yellow-300'">
           <div class="flex items-start gap-3">
-            <div class="w-10 h-10 rounded-full bg-red-100 flex items-center justify-center flex-shrink-0">
-              <AlertTriangle class="w-6 h-6 text-red-500" />
+            <div class="w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0"
+              :class="guestsStore.hasBookedVenue ? 'bg-red-100' : 'bg-yellow-100'">
+              <component :is="guestsStore.hasBookedVenue ? AlertTriangle : Info" class="w-6 h-6" :class="guestsStore.hasBookedVenue ? 'text-red-500' : 'text-yellow-500'" />
             </div>
             <div class="flex-1">
-              <p class="font-bold text-red-700">{{ guestsStore.capacityWarning.title }}</p>
-              <p class="text-sm text-red-600 mt-1">{{ guestsStore.capacityWarning.content }}</p>
+              <p class="font-bold" :class="guestsStore.hasBookedVenue ? 'text-red-700' : 'text-yellow-700'">{{ guestsStore.capacityWarning.title }}</p>
+              <p class="text-sm mt-1" :class="guestsStore.hasBookedVenue ? 'text-red-600' : 'text-yellow-600'">{{ guestsStore.capacityWarning.content }}</p>
             </div>
           </div>
         </div>
@@ -184,7 +188,7 @@ const getDifferenceIcon = (diff: number) => {
       :visible="toastVisible" 
       :message="toastMessage" 
       :description="toastDescription"
-      type="warning" 
+      :type="toastType" 
     />
   </div>
 </template>

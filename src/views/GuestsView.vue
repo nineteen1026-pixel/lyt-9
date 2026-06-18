@@ -1,7 +1,7 @@
 <script setup lang="ts">
-import { ref, computed } from 'vue'
+import { ref, computed, watch } from 'vue'
 import { useGuestsStore, type Guest, type GuestStatus, type GuestGroup } from '@/stores/guests'
-import { Search, Users, CheckCircle, Clock, XCircle, Utensils, Edit3, X, AlertTriangle } from 'lucide-vue-next'
+import { Search, Users, CheckCircle, Clock, XCircle, Utensils, Edit3, X, AlertTriangle, Info } from 'lucide-vue-next'
 import Toast from '@/components/Toast.vue'
 
 const guestsStore = useGuestsStore()
@@ -82,6 +82,21 @@ const getAvatarColor = (name: string) => {
   return colors[index]
 }
 
+const previewValidation = computed(() => {
+  if (!selectedGuest.value) return null
+  return guestsStore.validateTableAssignment(selectedGuest.value.id, editingTableNumber.value)
+})
+
+const canSave = computed(() => {
+  if (!selectedGuest.value) return false
+  if (editingTableNumber.value === selectedGuest.value.tableNumber) return false
+  return previewValidation.value?.valid ?? false
+})
+
+const previewAssignedCount = computed(() => {
+  return previewValidation.value?.assignedCount ?? guestsStore.assignedGuestsCount
+})
+
 const openTableModal = (guest: Guest) => {
   selectedGuest.value = guest
   editingTableNumber.value = guest.tableNumber
@@ -95,7 +110,7 @@ const closeTableModal = () => {
 }
 
 const saveTableNumber = () => {
-  if (!selectedGuest.value) return
+  if (!selectedGuest.value || !canSave.value) return
 
   const tableNum = editingTableNumber.value
   const result = guestsStore.updateGuestTable(selectedGuest.value.id, tableNum)
@@ -137,8 +152,13 @@ const clearTableNumber = () => {
             <p class="text-xs text-gray-500">已确认</p>
           </div>
           <div class="animate-slide-up bg-white rounded-2xl p-3 shadow-md text-center" style="animation-delay: 0.25s">
-            <p class="text-2xl font-bold" :class="guestsStore.isOverCapacity ? 'text-red-500' : 'text-primary-500'">
-              {{ guestsStore.assignedGuestsCount }}/{{ guestsStore.bookedVenueCapacity }}
+            <p class="text-2xl font-bold" :class="guestsStore.isOverCapacity ? 'text-red-500' : (guestsStore.hasBookedVenue ? 'text-primary-500' : 'text-yellow-500')">
+              <template v-if="guestsStore.hasBookedVenue">
+                {{ guestsStore.assignedGuestsCount }}/{{ guestsStore.bookedVenueCapacity }}
+              </template>
+              <template v-else>
+                未预订
+              </template>
             </p>
             <p class="text-xs text-gray-500">已分配/场地容量</p>
           </div>
@@ -148,12 +168,13 @@ const clearTableNumber = () => {
           </div>
         </div>
 
-        <div v-if="guestsStore.capacityWarning" class="animate-slide-up mb-4 bg-red-50 border border-red-200 rounded-2xl p-4 shadow-sm" style="animation-delay: 0.35s">
+        <div v-if="guestsStore.capacityWarning" class="animate-slide-up mb-4 rounded-2xl p-4 shadow-sm" style="animation-delay: 0.35s"
+          :class="guestsStore.hasBookedVenue ? 'bg-red-50 border border-red-200' : 'bg-yellow-50 border border-yellow-200'">
           <div class="flex items-start gap-3">
-            <AlertTriangle class="w-6 h-6 text-red-500 flex-shrink-0 mt-0.5" />
+            <component :is="guestsStore.hasBookedVenue ? AlertTriangle : Info" class="w-6 h-6 flex-shrink-0 mt-0.5" :class="guestsStore.hasBookedVenue ? 'text-red-500' : 'text-yellow-500'" />
             <div>
-              <p class="font-medium text-red-700">{{ guestsStore.capacityWarning.title }}</p>
-              <p class="text-sm text-red-600 mt-1">{{ guestsStore.capacityWarning.content }}</p>
+              <p class="font-medium" :class="guestsStore.hasBookedVenue ? 'text-red-700' : 'text-yellow-700'">{{ guestsStore.capacityWarning.title }}</p>
+              <p class="text-sm mt-1" :class="guestsStore.hasBookedVenue ? 'text-red-600' : 'text-yellow-600'">{{ guestsStore.capacityWarning.content }}</p>
             </div>
           </div>
         </div>
@@ -270,10 +291,17 @@ const clearTableNumber = () => {
           </div>
 
           <div class="space-y-4">
-            <div v-if="selectedGuest?.status !== 'confirmed'" class="p-4 bg-yellow-50 rounded-xl">
-              <p class="text-sm text-yellow-700">
+            <div v-if="selectedGuest?.status === 'declined'" class="p-4 bg-red-50 rounded-xl">
+              <p class="text-sm text-red-700">
                 <AlertTriangle class="w-4 h-4 inline mr-1" />
-                该宾客状态为「{{ getStatusConfig(selectedGuest?.status || 'pending').label }}」，分桌后不计入场地容量统计。
+                该宾客状态为「缺席」，无需分桌。
+              </p>
+            </div>
+
+            <div v-if="!guestsStore.hasBookedVenue" class="p-4 bg-yellow-50 rounded-xl">
+              <p class="text-sm text-yellow-700">
+                <Info class="w-4 h-4 inline mr-1" />
+                尚未预订场地，请先预订场地后再进行分桌安排。
               </p>
             </div>
 
@@ -283,7 +311,8 @@ const clearTableNumber = () => {
                 v-model.number="editingTableNumber"
                 type="number"
                 min="1"
-                class="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-primary-400 focus:outline-none transition-colors text-lg font-medium text-center"
+                class="w-full px-4 py-3 border-2 rounded-xl focus:outline-none transition-colors text-lg font-medium text-center"
+                :class="previewValidation && !previewValidation.valid ? 'border-red-300 focus:border-red-400' : 'border-gray-200 focus:border-primary-400'"
                 placeholder="输入桌号，留空表示取消分桌"
               />
               <button 
@@ -295,23 +324,38 @@ const clearTableNumber = () => {
               </button>
             </div>
 
+            <div v-if="previewValidation && !previewValidation.valid" class="p-4 bg-red-50 rounded-xl border border-red-200">
+              <p class="text-sm text-red-700">
+                <AlertTriangle class="w-4 h-4 inline mr-1" />
+                {{ previewValidation.message }}
+              </p>
+            </div>
+
             <div class="bg-gray-50 rounded-xl p-4">
               <div class="flex justify-between text-sm">
-                <span class="text-gray-500">已分配人数</span>
-                <span class="font-medium" :class="guestsStore.isOverCapacity ? 'text-red-500' : 'text-gray-800'">
-                  {{ guestsStore.assignedGuestsCount }} / {{ guestsStore.bookedVenueCapacity }} 人
+                <span class="text-gray-500">
+                  <template v-if="guestsStore.hasBookedVenue">保存后已分配人数</template>
+                  <template v-else>已分配人数</template>
+                </span>
+                <span class="font-medium" :class="(previewValidation && previewValidation.overflow > 0) ? 'text-red-500' : 'text-gray-800'">
+                  <template v-if="guestsStore.hasBookedVenue">
+                    {{ previewAssignedCount }} / {{ guestsStore.bookedVenueCapacity }} 人
+                  </template>
+                  <template v-else>
+                    {{ guestsStore.assignedGuestsCount }} / 未预订
+                  </template>
                 </span>
               </div>
-              <div class="w-full bg-gray-200 rounded-full h-2 mt-2 overflow-hidden">
+              <div v-if="guestsStore.hasBookedVenue" class="w-full bg-gray-200 rounded-full h-2 mt-2 overflow-hidden">
                 <div 
                   class="h-full rounded-full transition-all duration-300"
-                  :class="guestsStore.isOverCapacity ? 'bg-red-500' : 'bg-primary-500'"
-                  :style="{ width: `${Math.min((guestsStore.assignedGuestsCount / guestsStore.bookedVenueCapacity) * 100, 100)}%` }"
+                  :class="(previewValidation && previewValidation.overflow > 0) ? 'bg-red-500' : 'bg-primary-500'"
+                  :style="{ width: `${Math.min((previewAssignedCount / guestsStore.bookedVenueCapacity) * 100, 100)}%` }"
                 ></div>
               </div>
-              <p v-if="guestsStore.isOverCapacity" class="text-xs text-red-500 mt-2">
+              <p v-if="previewValidation && previewValidation.overflow > 0" class="text-xs text-red-500 mt-2">
                 <AlertTriangle class="w-3 h-3 inline mr-1" />
-                当前已超出场地容量 {{ guestsStore.capacityOverflow }} 人
+                保存后将超出场地容量 {{ previewValidation.overflow }} 人
               </p>
             </div>
 
@@ -324,7 +368,8 @@ const clearTableNumber = () => {
               </button>
               <button 
                 @click="saveTableNumber"
-                class="flex-1 py-3 bg-gradient-to-r from-primary-400 to-primary-500 text-white rounded-xl font-medium hover:shadow-lg transition-all duration-300"
+                :disabled="!canSave"
+                class="flex-1 py-3 bg-gradient-to-r from-primary-400 to-primary-500 text-white rounded-xl font-medium hover:shadow-lg transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:shadow-none"
               >
                 保存
               </button>

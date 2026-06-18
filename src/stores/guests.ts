@@ -60,15 +60,17 @@ export const useGuestsStore = defineStore('guests', () => {
   const bothGuests = computed(() => guests.value.filter(g => g.group === 'both'))
 
   const assignedGuestsCount = computed(() =>
-    guests.value.filter(g => g.tableNumber !== null && g.status === 'confirmed').length
+    guests.value.filter(g => g.tableNumber !== null && g.status !== 'declined').length
   )
 
   const bookedVenueCapacity = computed(() =>
     venuesStore.bookedVenues.reduce((sum, v) => sum + v.capacity, 0)
   )
 
+  const hasBookedVenue = computed(() => bookedVenueCapacity.value > 0)
+
   const isOverCapacity = computed(() =>
-    assignedGuestsCount.value > bookedVenueCapacity.value
+    hasBookedVenue.value && assignedGuestsCount.value > bookedVenueCapacity.value
   )
 
   const capacityOverflow = computed(() =>
@@ -81,8 +83,18 @@ export const useGuestsStore = defineStore('guests', () => {
       return { valid: false, message: '宾客不存在', assignedCount: 0, venueCapacity: 0, overflow: 0 }
     }
 
-    if (guest.status !== 'confirmed') {
-      return { valid: true, message: '', assignedCount: assignedGuestsCount.value, venueCapacity: bookedVenueCapacity.value, overflow: 0 }
+    if (guest.status === 'declined') {
+      return { valid: false, message: '缺席宾客无需分桌', assignedCount: assignedGuestsCount.value, venueCapacity: bookedVenueCapacity.value, overflow: 0 }
+    }
+
+    if (!hasBookedVenue.value && newTableNumber !== null) {
+      return {
+        valid: false,
+        message: '尚未预订场地，请先预订场地后再进行分桌。',
+        assignedCount: assignedGuestsCount.value,
+        venueCapacity: 0,
+        overflow: 0
+      }
     }
 
     const currentAssigned = assignedGuestsCount.value
@@ -133,8 +145,17 @@ export const useGuestsStore = defineStore('guests', () => {
   }
 
   const capacityWarning = computed(() => {
-    if (bookedVenueCapacity.value === 0) {
-      return null
+    if (!hasBookedVenue.value) {
+      if (assignedGuestsCount.value > 0) {
+        return {
+          title: '未预订场地预警',
+          content: '当前尚未预订场地，请先预订场地后再进行分桌安排。'
+        }
+      }
+      return {
+        title: '未预订场地提示',
+        content: '请先预订场地，以便进行宾客分桌安排。'
+      }
     }
     if (isOverCapacity.value) {
       const venueNames = venuesStore.bookedVenues.map(v => v.name).join('、')
@@ -161,6 +182,7 @@ export const useGuestsStore = defineStore('guests', () => {
     bothGuests,
     assignedGuestsCount,
     bookedVenueCapacity,
+    hasBookedVenue,
     isOverCapacity,
     capacityOverflow,
     validateTableAssignment,
