@@ -1,9 +1,10 @@
 <script setup lang="ts">
-import { ref, computed, watch } from 'vue'
-import { useGuestsStore, type Guest, type GuestStatus, type GuestGroup, type ImportDedupeMode } from '@/stores/guests'
+import { ref, computed } from 'vue'
+import { useGuestsStore, type Guest, type GuestStatus, type GuestGroup, type ImportDedupeMode, type PerTableValidationResult } from '@/stores/guests'
 import {
   Search, Users, CheckCircle, Clock, XCircle, Utensils, Edit3, X, AlertTriangle, Info,
-  Upload, Download, FileSpreadsheet, ChevronDown, ChevronUp, Layers, RefreshCw, SkipForward, Plus
+  Upload, Download, FileSpreadsheet, ChevronDown, ChevronUp, Layers, RefreshCw, SkipForward, Plus,
+  LayoutGrid, List, GripVertical, Settings2
 } from 'lucide-vue-next'
 import Toast from '@/components/Toast.vue'
 
@@ -11,12 +12,18 @@ const guestsStore = useGuestsStore()
 const searchQuery = ref('')
 const activeFilter = ref<GuestStatus | 'all'>('all')
 const activeGroup = ref<GuestGroup | 'all'>('all')
+const viewMode = ref<'list' | 'table'>('list')
+
+const draggedGuestId = ref<string | null>(null)
+const dragOverGuestId = ref<string | null>(null)
 
 const showTableModal = ref(false)
 const selectedGuest = ref<Guest | null>(null)
 const editingTableNumber = ref<number | null>(null)
 
 const showTableStats = ref(false)
+const showMaxPerTableSetting = ref(false)
+const editingMaxPerTable = ref(guestsStore.maxGuestsPerTable)
 const isImporting = ref(false)
 const fileInputRef = ref<HTMLInputElement | null>(null)
 const pendingFile = ref<File | null>(null)
@@ -103,6 +110,105 @@ const getAvatarColor = (name: string) => {
   const index = name.charCodeAt(0) % colors.length
   return colors[index]
 }
+
+const filteredTableStats = computed(() => {
+  return guestsStore.tableStats
+    .map(table => ({
+      ...table,
+      guests: table.guests.filter(guest => {
+        const matchesSearch = guest.name.includes(searchQuery.value) || guest.phone.includes(searchQuery.value)
+        const matchesStatus = activeFilter.value === 'all' || guest.status === activeFilter.value
+        const matchesGroup = activeGroup.value === 'all' || guest.group === activeGroup.value
+        return matchesSearch && matchesStatus && matchesGroup
+      })
+    }))
+    .filter(table => table.guests.length > 0)
+    .map(table => ({
+      ...table,
+      count: table.guests.length
+    }))
+})
+
+const unassignedFilteredGuests = computed(() => {
+  return guestsStore.guests.filter(guest => {
+    const matchesSearch = guest.name.includes(searchQuery.value) || guest.phone.includes(searchQuery.value)
+    const matchesStatus = activeFilter.value === 'all' || guest.status === activeFilter.value
+    const matchesGroup = activeGroup.value === 'all' || guest.group === activeGroup.value
+    const isUnassigned = guest.tableNumber === null || guest.status === 'declined'
+    return matchesSearch && matchesStatus && matchesGroup && isUnassigned
+  })
+})
+
+const onDragStart = (guestId: string, event: DragEvent) => {
+  draggedGuestId.value = guestId
+  if (event.dataTransfer) {
+    event.dataTransfer.effectAllowed = 'move'
+    event.dataTransfer.setData('text/plain', guestId)
+  }
+}
+
+const onDragOver = (guestId: string, event: DragEvent) => {
+  event.preventDefault()
+  if (event.dataTransfer) {
+    event.dataTransfer.dropEffect = 'move'
+  }
+  dragOverGuestId.value = guestId
+}
+
+const onDragLeave = () => {
+  dragOverGuestId.value = null
+}
+
+const onDrop = (targetGuestId: string, event: DragEvent) => {
+  event.preventDefault()
+  dragOverGuestId.value = null
+
+  if (!draggedGuestId.value || draggedGuestId.value === targetGuestId) {
+    draggedGuestId.value = null
+    return
+  }
+
+  const sourceGuest = guestsStore.guests.find(g => g.id === draggedGuestId.value)
+  const targetGuest = guestsStore.guests.find(g => g.id === targetGuestId)
+
+  if (!sourceGuest || !targetGuest) {
+    draggedGuestId.value = null
+    return
+  }
+
+  if (sourceGuest.tableNumber !== targetGuest.tableNumber) {
+    showToast('仅支持同桌内调位', '拖拽调位仅限同一桌号的宾客之间', 'warning')
+    draggedGuestId.value = null
+    return
+  }
+
+  const success = guestsStore.swapGuestSeat(draggedGuestId.value, targetGuestId)
+  if (success) {
+    showToast('座位已调换', `${sourceGuest.name} ↔ ${targetGuest.name}`, 'success')
+  }
+  draggedGuestId.value = null
+}
+
+const onDragEnd = () => {
+  draggedGuestId.value = null
+  dragOverGuestId.value = null
+}
+
+const saveMaxPerTable = () => {
+  const val = editingMaxPerTable.value
+  if (val >= 1) {
+    guestsStore.setMaxGuestsPerTable(val)
+    showMaxPerTableSetting.value = false
+    showToast('每桌人数上限已更新', `当前上限：${val}人/桌`, 'success')
+  }
+}
+
+const getTableOverflowTables = computed(() => {
+  return guestsStore.tableStats.filter(t => {
+    const v = guestsStore.perTableValidationMap.get(t.tableNumber)
+    return v && !v.valid
+  })
+})
 
 const previewValidation = computed(() => {
   if (!selectedGuest.value) return null
@@ -349,19 +455,39 @@ const executeImport = async () => {
           />
         </div>
 
-        <div class="animate-slide-up mb-4 flex gap-2 overflow-x-auto pb-2" style="animation-delay: 0.5s">
-          <button 
-            v-for="filter in statusFilters" 
-            :key="filter.key"
-            @click="activeFilter = filter.key"
-            class="flex items-center gap-1.5 px-4 py-2 rounded-full text-sm font-medium whitespace-nowrap transition-all duration-300"
-            :class="activeFilter === filter.key 
-              ? 'bg-primary-500 text-white shadow-md' 
-              : 'bg-white text-gray-600 hover:bg-primary-50'"
-          >
-            <component :is="filter.icon" class="w-4 h-4" />
-            {{ filter.label }}
-          </button>
+        <div class="animate-slide-up mb-4 flex items-center gap-2" style="animation-delay: 0.45s">
+          <div class="flex gap-2 overflow-x-auto pb-2 flex-1">
+            <button 
+              v-for="filter in statusFilters" 
+              :key="filter.key"
+              @click="activeFilter = filter.key"
+              class="flex items-center gap-1.5 px-4 py-2 rounded-full text-sm font-medium whitespace-nowrap transition-all duration-300"
+              :class="activeFilter === filter.key 
+                ? 'bg-primary-500 text-white shadow-md' 
+                : 'bg-white text-gray-600 hover:bg-primary-50'"
+            >
+              <component :is="filter.icon" class="w-4 h-4" />
+              {{ filter.label }}
+            </button>
+          </div>
+          <div class="flex bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden flex-shrink-0">
+            <button
+              @click="viewMode = 'list'"
+              class="p-2 transition-colors"
+              :class="viewMode === 'list' ? 'bg-primary-500 text-white' : 'text-gray-400 hover:text-gray-600'"
+              title="列表视图"
+            >
+              <List class="w-5 h-5" />
+            </button>
+            <button
+              @click="viewMode = 'table'"
+              class="p-2 transition-colors"
+              :class="viewMode === 'table' ? 'bg-primary-500 text-white' : 'text-gray-400 hover:text-gray-600'"
+              title="桌号聚合视图"
+            >
+              <LayoutGrid class="w-5 h-5" />
+            </button>
+          </div>
         </div>
 
         <div class="animate-slide-up mb-4 flex gap-2 overflow-x-auto pb-2" style="animation-delay: 0.6s">
@@ -378,7 +504,205 @@ const executeImport = async () => {
           </button>
         </div>
 
-        <div class="space-y-3">
+        <div v-if="viewMode === 'table'" class="space-y-4">
+          <div class="flex items-center justify-between">
+            <div class="flex items-center gap-2">
+              <Layers class="w-5 h-5 text-champagne-500" />
+              <span class="text-sm font-medium text-gray-600">桌号聚合视图</span>
+              <span class="text-xs text-gray-400">拖拽宾客可同桌内调位</span>
+            </div>
+            <button
+              @click="showMaxPerTableSetting = !showMaxPerTableSetting"
+              class="flex items-center gap-1 px-3 py-1.5 bg-white rounded-lg shadow-sm text-xs font-medium text-gray-500 hover:text-primary-500 transition-colors border border-gray-100"
+            >
+              <Settings2 class="w-3.5 h-3.5" />
+              每桌上限 {{ guestsStore.maxGuestsPerTable }}人
+            </button>
+          </div>
+
+          <div v-if="showMaxPerTableSetting" class="animate-fade-in bg-white rounded-2xl p-4 shadow-md border border-primary-100">
+            <div class="flex items-center gap-3">
+              <label class="text-sm font-medium text-gray-700 whitespace-nowrap">每桌人数上限</label>
+              <input
+                v-model.number="editingMaxPerTable"
+                type="number"
+                min="1"
+                class="w-20 px-3 py-2 border-2 rounded-xl text-center font-medium focus:outline-none transition-colors"
+                :class="editingMaxPerTable < 1 ? 'border-red-300' : 'border-gray-200 focus:border-primary-400'"
+              />
+              <button
+                @click="saveMaxPerTable"
+                :disabled="editingMaxPerTable < 1"
+                class="px-4 py-2 bg-primary-500 text-white rounded-xl text-sm font-medium hover:bg-primary-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                保存
+              </button>
+              <button
+                @click="showMaxPerTableSetting = false; editingMaxPerTable = guestsStore.maxGuestsPerTable"
+                class="px-4 py-2 border border-gray-200 text-gray-500 rounded-xl text-sm font-medium hover:bg-gray-50 transition-colors"
+              >
+                取消
+              </button>
+            </div>
+          </div>
+
+          <div v-if="getTableOverflowTables.length > 0" class="animate-fade-in rounded-2xl p-4 bg-red-50 border border-red-200">
+            <div class="flex items-start gap-3">
+              <AlertTriangle class="w-5 h-5 text-red-500 flex-shrink-0 mt-0.5" />
+              <div>
+                <p class="font-medium text-red-700 text-sm">部分桌次超出人数上限</p>
+                <div class="mt-1 space-y-1">
+                  <p v-for="t in getTableOverflowTables" :key="t.tableNumber" class="text-xs text-red-600">
+                    {{ t.tableNumber }}号桌：{{ t.count }}/{{ guestsStore.maxGuestsPerTable }}人
+                  </p>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div
+            v-for="table in filteredTableStats"
+            :key="table.tableNumber"
+            class="animate-fade-in bg-white rounded-2xl shadow-md overflow-hidden"
+          >
+            <div class="px-4 py-3 flex items-center justify-between"
+              :class="guestsStore.perTableValidationMap.get(table.tableNumber)?.valid ? 'bg-champagne-50' : 'bg-red-50'"
+            >
+              <div class="flex items-center gap-2">
+                <Utensils class="w-5 h-5" :class="guestsStore.perTableValidationMap.get(table.tableNumber)?.valid ? 'text-champagne-500' : 'text-red-400'" />
+                <span class="font-bold" :class="guestsStore.perTableValidationMap.get(table.tableNumber)?.valid ? 'text-primary-600' : 'text-red-600'">
+                  {{ table.tableNumber }}号桌
+                </span>
+              </div>
+              <div class="flex items-center gap-2">
+                <span
+                  class="text-xs px-2.5 py-1 rounded-full font-medium"
+                  :class="guestsStore.perTableValidationMap.get(table.tableNumber)?.valid
+                    ? 'bg-champagne-200 text-champagne-400'
+                    : 'bg-red-100 text-red-600'"
+                >
+                  {{ table.count }}/{{ guestsStore.maxGuestsPerTable }}人
+                </span>
+                <div v-if="guestsStore.perTableValidationMap.get(table.tableNumber)?.valid && table.count > 0" class="w-16 bg-gray-200 rounded-full h-1.5 overflow-hidden">
+                  <div
+                    class="h-full rounded-full transition-all duration-300"
+                    :class="table.count / guestsStore.maxGuestsPerTable > 0.8 ? 'bg-yellow-400' : 'bg-primary-400'"
+                    :style="{ width: `${Math.min((table.count / guestsStore.maxGuestsPerTable) * 100, 100)}%` }"
+                  ></div>
+                </div>
+                <AlertTriangle v-if="!guestsStore.perTableValidationMap.get(table.tableNumber)?.valid" class="w-4 h-4 text-red-500" />
+              </div>
+            </div>
+
+            <div class="p-3 space-y-2">
+              <div
+                v-for="guest in table.guests"
+                :key="guest.id"
+                draggable="true"
+                @dragstart="onDragStart(guest.id, $event)"
+                @dragover="onDragOver(guest.id, $event)"
+                @dragleave="onDragLeave"
+                @drop="onDrop(guest.id, $event)"
+                @dragend="onDragEnd"
+                class="flex items-center gap-2.5 p-2.5 rounded-xl transition-all duration-200 cursor-grab active:cursor-grabbing"
+                :class="[
+                  dragOverGuestId === guest.id && draggedGuestId !== guest.id
+                    ? 'bg-primary-50 ring-2 ring-primary-300 scale-[1.02]'
+                    : 'bg-gray-50 hover:bg-gray-100',
+                  draggedGuestId === guest.id ? 'opacity-40 scale-95' : ''
+                ]"
+              >
+                <GripVertical class="w-4 h-4 text-gray-300 flex-shrink-0" />
+                <div
+                  class="w-9 h-9 rounded-full flex items-center justify-center text-white font-bold text-sm flex-shrink-0"
+                  :class="getAvatarColor(guest.name)"
+                >
+                  {{ guest.avatar }}
+                </div>
+                <div class="flex-1 min-w-0">
+                  <div class="flex items-center gap-1.5">
+                    <p class="text-sm font-medium text-gray-800 truncate">{{ guest.name }}</p>
+                    <span
+                      class="px-1.5 py-0.5 rounded-full text-[10px]"
+                      :class="getStatusConfig(guest.status).class"
+                    >
+                      {{ getStatusConfig(guest.status).label }}
+                    </span>
+                  </div>
+                  <div class="flex items-center gap-2 mt-0.5">
+                    <span class="text-xs text-gray-400">{{ getGroupLabel(guest.group) }}</span>
+                    <span class="text-xs text-gray-400">{{ guest.phone }}</span>
+                  </div>
+                </div>
+                <button
+                  @click="openTableModal(guest)"
+                  class="w-8 h-8 rounded-full bg-primary-50 flex items-center justify-center text-primary-400 hover:bg-primary-100 hover:text-primary-600 transition-colors flex-shrink-0"
+                  :disabled="guest.status === 'declined'"
+                  :class="{ 'opacity-50 cursor-not-allowed': guest.status === 'declined' }"
+                  title="编辑分桌"
+                >
+                  <Edit3 class="w-3.5 h-3.5" />
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <div v-if="unassignedFilteredGuests.length > 0" class="animate-fade-in bg-white rounded-2xl shadow-md overflow-hidden">
+            <div class="px-4 py-3 bg-gray-50 flex items-center justify-between">
+              <div class="flex items-center gap-2">
+                <Users class="w-5 h-5 text-gray-400" />
+                <span class="font-bold text-gray-500">未分桌</span>
+              </div>
+              <span class="text-xs bg-gray-200 text-gray-400 px-2.5 py-1 rounded-full font-medium">
+                {{ unassignedFilteredGuests.length }}人
+              </span>
+            </div>
+            <div class="p-3 space-y-2">
+              <div
+                v-for="guest in unassignedFilteredGuests"
+                :key="guest.id"
+                class="flex items-center gap-2.5 p-2.5 rounded-xl bg-gray-50"
+              >
+                <div
+                  class="w-9 h-9 rounded-full flex items-center justify-center text-white font-bold text-sm flex-shrink-0"
+                  :class="getAvatarColor(guest.name)"
+                >
+                  {{ guest.avatar }}
+                </div>
+                <div class="flex-1 min-w-0">
+                  <div class="flex items-center gap-1.5">
+                    <p class="text-sm font-medium text-gray-800 truncate">{{ guest.name }}</p>
+                    <span
+                      class="px-1.5 py-0.5 rounded-full text-[10px]"
+                      :class="getStatusConfig(guest.status).class"
+                    >
+                      {{ getStatusConfig(guest.status).label }}
+                    </span>
+                  </div>
+                  <div class="flex items-center gap-2 mt-0.5">
+                    <span class="text-xs text-gray-400">{{ getGroupLabel(guest.group) }}</span>
+                    <span class="text-xs text-gray-400">{{ guest.phone }}</span>
+                  </div>
+                </div>
+                <button
+                  v-if="guest.status !== 'declined'"
+                  @click="openTableModal(guest)"
+                  class="w-8 h-8 rounded-full bg-primary-50 flex items-center justify-center text-primary-400 hover:bg-primary-100 hover:text-primary-600 transition-colors flex-shrink-0"
+                  title="编辑分桌"
+                >
+                  <Edit3 class="w-3.5 h-3.5" />
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <div v-if="filteredTableStats.length === 0 && unassignedFilteredGuests.length === 0" class="animate-fade-in text-center py-16">
+            <LayoutGrid class="w-16 h-16 text-gray-300 mx-auto mb-4" />
+            <p class="text-gray-400">暂无分桌数据</p>
+          </div>
+        </div>
+
+        <div v-else class="space-y-3">
           <div 
             v-for="(guest, index) in filteredGuests" 
             :key="guest.id"

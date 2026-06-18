@@ -19,6 +19,7 @@ export interface Guest {
   status: GuestStatus
   attendance: '已确认' | '待确认' | '未出席'
   tableNumber: number | null
+  seatIndex: number
   avatar: string
 }
 
@@ -160,14 +161,14 @@ export const mockBudget: BudgetItem[] = [
 ]
 
 export const mockGuests: Guest[] = [
-  { id: '1', name: '张伟', phone: '13800138001', group: 'groom', status: 'confirmed', attendance: '已确认', tableNumber: 1, avatar: '张' },
-  { id: '2', name: '李娜', phone: '13800138002', group: 'bride', status: 'confirmed', attendance: '已确认', tableNumber: 2, avatar: '李' },
-  { id: '3', name: '王芳', phone: '13800138003', group: 'both', status: 'pending', attendance: '待确认', tableNumber: null, avatar: '王' },
-  { id: '4', name: '刘强', phone: '13800138004', group: 'groom', status: 'confirmed', attendance: '已确认', tableNumber: 1, avatar: '刘' },
-  { id: '5', name: '陈静', phone: '13800138005', group: 'bride', status: 'declined', attendance: '未出席', tableNumber: null, avatar: '陈' },
-  { id: '6', name: '赵磊', phone: '13800138006', group: 'both', status: 'confirmed', attendance: '已确认', tableNumber: 3, avatar: '赵' },
-  { id: '7', name: '孙丽', phone: '13800138007', group: 'groom', status: 'pending', attendance: '待确认', tableNumber: null, avatar: '孙' },
-  { id: '8', name: '周杰', phone: '13800138008', group: 'bride', status: 'confirmed', attendance: '已确认', tableNumber: 2, avatar: '周' }
+  { id: '1', name: '张伟', phone: '13800138001', group: 'groom', status: 'confirmed', attendance: '已确认', tableNumber: 1, seatIndex: 0, avatar: '张' },
+  { id: '2', name: '李娜', phone: '13800138002', group: 'bride', status: 'confirmed', attendance: '已确认', tableNumber: 2, seatIndex: 0, avatar: '李' },
+  { id: '3', name: '王芳', phone: '13800138003', group: 'both', status: 'pending', attendance: '待确认', tableNumber: null, seatIndex: 0, avatar: '王' },
+  { id: '4', name: '刘强', phone: '13800138004', group: 'groom', status: 'confirmed', attendance: '已确认', tableNumber: 1, seatIndex: 1, avatar: '刘' },
+  { id: '5', name: '陈静', phone: '13800138005', group: 'bride', status: 'declined', attendance: '未出席', tableNumber: null, seatIndex: 0, avatar: '陈' },
+  { id: '6', name: '赵磊', phone: '13800138006', group: 'both', status: 'confirmed', attendance: '已确认', tableNumber: 3, seatIndex: 0, avatar: '赵' },
+  { id: '7', name: '孙丽', phone: '13800138007', group: 'groom', status: 'pending', attendance: '待确认', tableNumber: null, seatIndex: 0, avatar: '孙' },
+  { id: '8', name: '周杰', phone: '13800138008', group: 'bride', status: 'confirmed', attendance: '已确认', tableNumber: 2, seatIndex: 1, avatar: '周' }
 ]
 
 export const mockVenues: Venue[] = [

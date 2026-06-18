@@ -31,20 +31,35 @@ export interface TableValidationResult {
   overflow: number
 }
 
+export interface PerTableValidationResult {
+  valid: boolean
+  message: string
+  currentCount: number
+  maxGuestsPerTable: number
+  overflow: number
+}
+
 export const useGuestsStore = defineStore('guests', () => {
   const STORAGE_KEY = 'wedding-guests'
+  const MAX_PER_TABLE_KEY = 'wedding-max-per-table'
   const venuesStore = useVenuesStore()
 
   const guests = ref<Guest[]>(get(STORAGE_KEY, mockGuests))
+  const maxGuestsPerTable = ref<number>(get(MAX_PER_TABLE_KEY, 10))
 
   watch(guests, (newValue) => {
     set(STORAGE_KEY, newValue)
   }, { deep: true })
 
+  watch(maxGuestsPerTable, (newValue) => {
+    set(MAX_PER_TABLE_KEY, newValue)
+  })
+
   function addGuest(guest: Omit<Guest, 'id'>) {
     const newGuest: Guest = {
       ...guest,
-      id: Date.now().toString()
+      id: Date.now().toString(),
+      seatIndex: guest.seatIndex ?? 0
     }
     guests.value.push(newGuest)
   }
@@ -102,6 +117,53 @@ export const useGuestsStore = defineStore('guests', () => {
   const capacityOverflow = computed(() =>
     Math.max(0, assignedGuestsCount.value - bookedVenueCapacity.value)
   )
+
+  function validatePerTableCapacity(tableNumber: number): PerTableValidationResult {
+    const tableGuests = guests.value.filter(g => g.tableNumber === tableNumber && g.status !== 'declined')
+    const count = tableGuests.length
+    const overflow = Math.max(0, count - maxGuestsPerTable.value)
+    return {
+      valid: count <= maxGuestsPerTable.value,
+      message: overflow > 0 ? `${tableNumber}号桌已坐${count}人，超出每桌上限${maxGuestsPerTable.value}人${overflow}人` : '',
+      currentCount: count,
+      maxGuestsPerTable: maxGuestsPerTable.value,
+      overflow
+    }
+  }
+
+  function swapGuestSeat(guestId1: string, guestId2: string): boolean {
+    const index1 = guests.value.findIndex(g => g.id === guestId1)
+    const index2 = guests.value.findIndex(g => g.id === guestId2)
+    if (index1 === -1 || index2 === -1) return false
+
+    const g1 = guests.value[index1]
+    const g2 = guests.value[index2]
+    if (g1.tableNumber !== g2.tableNumber || g1.tableNumber === null) return false
+
+    const tmpSeat = g1.seatIndex
+    guests.value[index1] = { ...g1, seatIndex: g2.seatIndex }
+    guests.value[index2] = { ...g2, seatIndex: tmpSeat }
+    return true
+  }
+
+  function setMaxGuestsPerTable(max: number) {
+    if (max >= 1) {
+      maxGuestsPerTable.value = max
+    }
+  }
+
+  const perTableValidationMap = computed(() => {
+    const map = new Map<number, PerTableValidationResult>()
+    const tableNumbers = new Set(
+      guests.value
+        .filter(g => g.tableNumber !== null && g.status !== 'declined')
+        .map(g => g.tableNumber!)
+    )
+    tableNumbers.forEach(tn => {
+      map.set(tn, validatePerTableCapacity(tn))
+    })
+    return map
+  })
 
   function validateTableAssignment(guestId: string, newTableNumber: number | null): TableValidationResult {
     const guest = getGuestById(guestId)
@@ -207,7 +269,7 @@ export const useGuestsStore = defineStore('guests', () => {
     return Array.from(tableMap.entries())
       .map(([tableNumber, tableGuests]) => ({
         tableNumber,
-        guests: tableGuests.sort((a, b) => a.name.localeCompare(b.name, 'zh-CN')),
+        guests: tableGuests.sort((a, b) => a.seatIndex - b.seatIndex),
         count: tableGuests.length
       }))
       .sort((a, b) => a.tableNumber - b.tableNumber)
@@ -351,6 +413,7 @@ export const useGuestsStore = defineStore('guests', () => {
               }
 
               const avatar = name.charAt(0)
+              const seatIndex = 0
               const existingGuest = findGuestByPhone(phone)
 
               if (existingGuest) {
@@ -385,7 +448,8 @@ export const useGuestsStore = defineStore('guests', () => {
                     status,
                     attendance: parseAttendance(status),
                     tableNumber: finalTableNumber,
-                    avatar
+                    avatar,
+                    seatIndex
                   })
                   result.updated++
                   return
@@ -416,7 +480,8 @@ export const useGuestsStore = defineStore('guests', () => {
                 status,
                 attendance: parseAttendance(status),
                 tableNumber: finalTableNumber,
-                avatar
+                avatar,
+                seatIndex
               })
               result.added++
             } catch (err: any) {
@@ -487,6 +552,7 @@ export const useGuestsStore = defineStore('guests', () => {
 
   return {
     guests,
+    maxGuestsPerTable,
     addGuest,
     updateGuest,
     deleteGuest,
@@ -504,6 +570,10 @@ export const useGuestsStore = defineStore('guests', () => {
     isOverCapacity,
     capacityOverflow,
     validateTableAssignment,
+    validatePerTableCapacity,
+    swapGuestSeat,
+    setMaxGuestsPerTable,
+    perTableValidationMap,
     updateGuestTable,
     capacityWarning,
     tableStats,
