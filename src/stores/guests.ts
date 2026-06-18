@@ -213,6 +213,23 @@ export const useGuestsStore = defineStore('guests', () => {
       }
     }
 
+    if (newTableNumber !== null && guest.tableNumber !== newTableNumber) {
+      const targetTableGuests = guests.value.filter(
+        g => g.tableNumber === newTableNumber && g.status !== 'declined' && g.id !== guest.id
+      )
+      const targetCount = targetTableGuests.length + 1
+      const perTableOverflow = Math.max(0, targetCount - maxGuestsPerTable.value)
+      if (perTableOverflow > 0) {
+        return {
+          valid: false,
+          message: `${newTableNumber}号桌人数超出上限！该桌当前已有${targetTableGuests.length}人，最多容纳${maxGuestsPerTable.value}人，添加后将超出${perTableOverflow}人。`,
+          assignedCount: newAssignedCount,
+          venueCapacity: capacity,
+          overflow
+        }
+      }
+    }
+
     return {
       valid: true,
       message: '',
@@ -323,7 +340,8 @@ export const useGuestsStore = defineStore('guests', () => {
     currentAssignedCount: number,
     currentGuestWasAssigned: boolean,
     newTableNumber: number | null,
-    status: GuestStatus
+    status: GuestStatus,
+    guestId: string | null
   ): { valid: boolean; message: string; finalTableNumber: number | null; newAssignedCount: number } {
     let tableNumber = newTableNumber
     if (status === 'declined') {
@@ -357,6 +375,23 @@ export const useGuestsStore = defineStore('guests', () => {
         message: `场地席位数不足！已预订场地「${venueNames}」总容量为${capacity}人，导入后将分配${newAssignedCount}人，超出${overflow}人。`,
         finalTableNumber: null,
         newAssignedCount: currentAssignedCount
+      }
+    }
+
+    if (tableNumber !== null) {
+      const currentTablesCount = guests.value.filter(
+        g => g.tableNumber === tableNumber && g.status !== 'declined' && g.id !== guestId
+      ).length
+      const willAdd = !currentGuestWasAssigned ? 1 : 0
+      const newCount = currentTablesCount + willAdd
+      const perTableOverflow = Math.max(0, newCount - maxGuestsPerTable.value)
+      if (perTableOverflow > 0) {
+        return {
+          valid: false,
+          message: `${tableNumber}号桌人数超出上限！该桌当前已有${currentTablesCount}人，最多容纳${maxGuestsPerTable.value}人，导入后将超出${perTableOverflow}人。`,
+          finalTableNumber: null,
+          newAssignedCount: currentAssignedCount
+        }
       }
     }
 
@@ -428,7 +463,8 @@ export const useGuestsStore = defineStore('guests', () => {
                     runningAssignedCount,
                     wasAssigned,
                     parsedTableNumber,
-                    status
+                    status,
+                    existingGuest.id
                   )
 
                   let finalTableNumber: number | null
@@ -460,7 +496,8 @@ export const useGuestsStore = defineStore('guests', () => {
                 runningAssignedCount,
                 false,
                 parsedTableNumber,
-                status
+                status,
+                null
               )
 
               let finalTableNumber: number | null

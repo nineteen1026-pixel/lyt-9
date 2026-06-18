@@ -115,18 +115,14 @@ const filteredTableStats = computed(() => {
   return guestsStore.tableStats
     .map(table => ({
       ...table,
-      guests: table.guests.filter(guest => {
+      displayGuests: table.guests.filter(guest => {
         const matchesSearch = guest.name.includes(searchQuery.value) || guest.phone.includes(searchQuery.value)
         const matchesStatus = activeFilter.value === 'all' || guest.status === activeFilter.value
         const matchesGroup = activeGroup.value === 'all' || guest.group === activeGroup.value
         return matchesSearch && matchesStatus && matchesGroup
       })
     }))
-    .filter(table => table.guests.length > 0)
-    .map(table => ({
-      ...table,
-      count: table.guests.length
-    }))
+    .filter(table => table.displayGuests.length > 0)
 })
 
 const unassignedFilteredGuests = computed(() => {
@@ -596,7 +592,7 @@ const executeImport = async () => {
 
             <div class="p-3 space-y-2">
               <div
-                v-for="guest in table.guests"
+                v-for="guest in table.displayGuests"
                 :key="guest.id"
                 draggable="true"
                 @dragstart="onDragStart(guest.id, $event)"
