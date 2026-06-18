@@ -56,11 +56,14 @@ const parseDate = (dateStr: string) => {
   return new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, parseInt(parts[2]))
 }
 
+const getTodayLocal = () => {
+  const now = new Date()
+  return new Date(now.getFullYear(), now.getMonth(), now.getDate())
+}
+
 const daysUntil = (dateStr: string) => {
   const target = parseDate(dateStr)
-  const today = new Date()
-  today.setHours(0, 0, 0, 0)
-  target.setHours(0, 0, 0, 0)
+  const today = getTodayLocal()
   const diff = target.getTime() - today.getTime()
   return Math.ceil(diff / (1000 * 60 * 60 * 24))
 }
@@ -68,10 +71,13 @@ const daysUntil = (dateStr: string) => {
 const weddingDaysLeft = computed(() => daysUntil(scheduleStore.weddingDate))
 const rehearsalDaysLeft = computed(() => daysUntil(rehearsalStore.rehearsalInfo.date))
 
-const addDays = (dateStr: string, days: number) => {
+const addDaysLocal = (dateStr: string, days: number) => {
   const date = parseDate(dateStr)
   date.setDate(date.getDate() + days)
-  return date.toISOString().split('T')[0]
+  const year = date.getFullYear()
+  const month = String(date.getMonth() + 1).padStart(2, '0')
+  const day = String(date.getDate()).padStart(2, '0')
+  return `${year}-${month}-${day}`
 }
 
 const formatDate = (date: Date) => {
@@ -79,10 +85,6 @@ const formatDate = (date: Date) => {
   const month = String(date.getMonth() + 1).padStart(2, '0')
   const day = String(date.getDate()).padStart(2, '0')
   return `${year}-${month}-${day}`
-}
-
-const getDeadlineDate = (daysBefore: number) => {
-  return addDays(scheduleStore.weddingDate, -daysBefore)
 }
 
 const expectedBudgetCategories = ['场地', '餐饮', '婚纱', '摄影', '化妆', '礼仪', '其他']
@@ -109,12 +111,17 @@ const guestsProgress = computed(() => {
   return (guestsStore.confirmedCount / guestsStore.totalCount) * 100
 })
 
-const guestsDeadlineDate = computed(() => getDeadlineDate(14))
-const venuesDeadlineDate = computed(() => getDeadlineDate(30))
-const photographyDeadlineDate = computed(() => getDeadlineDate(25))
-const dressDeadlineDate = computed(() => getDeadlineDate(20))
-const scheduleDeadlineDate = computed(() => getDeadlineDate(7))
-const budgetDeadlineDate = computed(() => getDeadlineDate(30))
+const getPriorityByDays = (days: number | null): 'high' | 'medium' | 'low' => {
+  if (days === null) return 'high'
+  if (days <= 7) return 'high'
+  if (days <= 30) return 'medium'
+  return 'low'
+}
+
+const getDaysLeft = (date: string | null): number | null => {
+  if (!date) return null
+  return daysUntil(date)
+}
 
 const venuesProgress = computed(() => {
   const hasContracted = venuesStore.venues.some(v => v.contracted)
@@ -242,106 +249,106 @@ interface TodoItem {
   id: string
   title: string
   description: string
-  date: string
-  daysLeft: number
+  date: string | null
+  daysLeft: number | null
   module: string
   modulePath: string
   icon: any
   priority: 'high' | 'medium' | 'low'
   completed: boolean
-}
-
-const getPriorityByDays = (days: number): 'high' | 'medium' | 'low' => {
-  if (days <= 7) return 'high'
-  if (days <= 30) return 'medium'
-  return 'low'
+  sortDate: number
 }
 
 const todoItems = computed<TodoItem[]>(() => {
   const items: TodoItem[] = []
+  const today = getTodayLocal().getTime()
+
+  const createTodo = (options: Omit<TodoItem, 'sortDate'>): TodoItem => {
+    let sortDate: number
+    if (options.date) {
+      sortDate = parseDate(options.date).getTime()
+    } else {
+      sortDate = today + 365 * 24 * 60 * 60 * 1000
+    }
+    return { ...options, sortDate }
+  }
 
   if (budgetCompletionProgress.value < 100) {
     const missingCategories = expectedBudgetCategories.filter(cat =>
       !budgetStore.items.some(item => item.category === cat && item.budget > 0)
     )
-    const days = daysUntil(budgetDeadlineDate.value)
-    if (days >= -30) {
-      items.push({
-        id: 'budget-plan',
-        title: `完善预算规划`,
-        description: `还有 ${missingCategories.length} 个类别未设置预算：${missingCategories.join('、')}`,
-        date: budgetDeadlineDate.value,
-        daysLeft: days,
-        module: '预算',
-        modulePath: '/budget',
-        icon: Wallet,
-        priority: getPriorityByDays(Math.max(0, days)),
-        completed: false
-      })
-    }
+    items.push(createTodo({
+      id: 'budget-plan',
+      title: `完善预算规划`,
+      description: `还有 ${missingCategories.length} 个类别未设置预算：${missingCategories.join('、')}`,
+      date: null,
+      daysLeft: null,
+      module: '预算',
+      modulePath: '/budget',
+      icon: Wallet,
+      priority: 'high',
+      completed: false
+    }))
   }
 
   if (hasOverBudget.value) {
-    items.push({
+    items.push(createTodo({
       id: 'budget-over',
       title: `预算超支警告`,
       description: `${overBudgetItems.value.length} 项支出超预算，需及时调整`,
-      date: '',
-      daysLeft: 0,
+      date: null,
+      daysLeft: null,
       module: '预算',
       modulePath: '/budget',
       icon: AlertCircle,
       priority: 'high',
       completed: false
-    })
+    }))
   }
 
   if (guestsStore.pendingCount > 0) {
-    const days = daysUntil(guestsDeadlineDate.value)
-    items.push({
+    items.push(createTodo({
       id: 'guests-pending',
       title: `确认 ${guestsStore.pendingCount} 位宾客出席`,
       description: `还有 ${guestsStore.pendingCount} 位宾客待确认`,
-      date: guestsDeadlineDate.value,
-      daysLeft: days,
+      date: null,
+      daysLeft: null,
       module: '宾客',
       modulePath: '/guests',
       icon: Users,
-      priority: getPriorityByDays(Math.max(0, days)),
+      priority: 'high',
       completed: false
-    })
+    }))
   }
 
   if (venuesProgress.value < 100) {
-    const days = daysUntil(venuesDeadlineDate.value)
-    items.push({
+    items.push(createTodo({
       id: 'venues-contract',
       title: '预订婚礼场地',
       description: '请尽快确定并签订场地合同',
-      date: venuesDeadlineDate.value,
-      daysLeft: days,
+      date: null,
+      daysLeft: null,
       module: '场地',
       modulePath: '/venues',
       icon: Building2,
-      priority: getPriorityByDays(Math.max(0, days)),
+      priority: 'high',
       completed: false
-    })
+    }))
   }
 
   if (photographyProgress.value < 100) {
-    const days = daysUntil(photographyDeadlineDate.value)
-    items.push({
+    items.push(createTodo({
       id: 'photography-contract',
       title: '确定摄影团队',
       description: '请选择并签订摄影团队合同',
-      date: photographyDeadlineDate.value,
-      daysLeft: days,
+      date: null,
+      daysLeft: null,
       module: '摄影',
       modulePath: '/photography',
       icon: Camera,
-      priority: getPriorityByDays(Math.max(0, days)),
+      priority: 'high',
       completed: false
-    })
+    }))
   }
 
   if (dressProgress.value < 100) {
@@ -349,26 +356,25 @@ const todoItems = computed<TodoItem[]>(() => {
     const missingTypes = requiredTypes.filter(type =>
       !dressStore.dresses.some(d => d.type === type && d.contracted)
     )
-    const days = daysUntil(dressDeadlineDate.value)
-    items.push({
+    items.push(createTodo({
       id: 'dress-contract',
       title: `确认${missingTypes.join('、')}`,
       description: '请尽快确定并签订婚纱合同',
-      date: dressDeadlineDate.value,
-      daysLeft: days,
+      date: null,
+      daysLeft: null,
       module: '婚纱',
       modulePath: '/dress',
       icon: Shirt,
-      priority: getPriorityByDays(Math.max(0, days)),
+      priority: 'high',
       completed: false
-    })
+    }))
   }
 
   dressStore.dresses.forEach(dress => {
     if (dress.fittingDate) {
       const days = daysUntil(dress.fittingDate)
       if (days >= -7 && days <= 30) {
-        items.push({
+        items.push(createTodo({
           id: `fitting-${dress.id}`,
           title: `${dress.type}试穿`,
           description: `${dress.name} - ${dress.brand}`,
@@ -377,9 +383,9 @@ const todoItems = computed<TodoItem[]>(() => {
           module: '婚纱',
           modulePath: '/dress',
           icon: Gift,
-          priority: getPriorityByDays(Math.max(0, days)),
+          priority: getPriorityByDays(days),
           completed: days < 0
-        })
+        }))
       }
     }
   })
@@ -388,7 +394,7 @@ const todoItems = computed<TodoItem[]>(() => {
     if (photo.shootDate && photo.contracted) {
       const days = daysUntil(photo.shootDate)
       if (days >= -7 && days <= 30) {
-        items.push({
+        items.push(createTodo({
           id: `shoot-${photo.id}`,
           title: `婚纱照拍摄`,
           description: `${photo.teamName} - ${photo.packageType}`,
@@ -397,33 +403,32 @@ const todoItems = computed<TodoItem[]>(() => {
           module: '摄影',
           modulePath: '/photography',
           icon: Camera,
-          priority: getPriorityByDays(Math.max(0, days)),
+          priority: getPriorityByDays(days),
           completed: days < 0
-        })
+        }))
       }
     }
   })
 
   if (scheduleProgress.value < 100) {
-    const days = daysUntil(scheduleDeadlineDate.value)
     const expectedItems = 7
     const missingCount = Math.max(0, expectedItems - scheduleStore.items.length)
-    items.push({
+    items.push(createTodo({
       id: 'schedule-plan',
       title: '完善婚礼流程',
       description: `建议安排 ${expectedItems} 个环节，当前已有 ${scheduleStore.items.length} 个`,
-      date: scheduleDeadlineDate.value,
-      daysLeft: days,
+      date: null,
+      daysLeft: null,
       module: '流程',
       modulePath: '/schedule',
       icon: Calendar,
-      priority: getPriorityByDays(Math.max(0, days)),
+      priority: 'high',
       completed: false
-    })
+    }))
   }
 
   if (rehearsalDaysLeft.value >= -7 && rehearsalDaysLeft.value <= 30) {
-    items.push({
+    items.push(createTodo({
       id: 'rehearsal',
       title: '婚礼彩排',
       description: `${rehearsalStore.rehearsalInfo.location} ${rehearsalStore.rehearsalInfo.time}`,
@@ -432,13 +437,13 @@ const todoItems = computed<TodoItem[]>(() => {
       module: '彩排',
       modulePath: '/rehearsal',
       icon: ListChecks,
-      priority: getPriorityByDays(Math.max(0, rehearsalDaysLeft.value)),
+      priority: getPriorityByDays(rehearsalDaysLeft.value),
       completed: rehearsalDaysLeft.value < 0
-    })
+    }))
   }
 
   if (weddingDaysLeft.value >= -7) {
-    items.push({
+    items.push(createTodo({
       id: 'wedding',
       title: '💒 婚礼之日',
       description: '愿你们携手一生，幸福美满！',
@@ -449,15 +454,14 @@ const todoItems = computed<TodoItem[]>(() => {
       icon: Bell,
       priority: 'high',
       completed: weddingDaysLeft.value < 0
-    })
+    }))
   }
 
   return items.sort((a, b) => {
-    const priorityOrder = { high: 0, medium: 1, low: 2 }
-    if (priorityOrder[a.priority] !== priorityOrder[b.priority]) {
-      return priorityOrder[a.priority] - priorityOrder[b.priority]
+    if (a.completed !== b.completed) {
+      return a.completed ? 1 : -1
     }
-    return a.daysLeft - b.daysLeft
+    return a.sortDate - b.sortDate
   })
 })
 
@@ -470,7 +474,8 @@ const getPriorityColor = (priority: string) => {
   }
 }
 
-const getDaysLabel = (days: number) => {
+const getDaysLabel = (days: number | null) => {
+  if (days === null) return '待处理'
   if (days < 0) return '已过期'
   if (days === 0) return '今天'
   if (days === 1) return '明天'
