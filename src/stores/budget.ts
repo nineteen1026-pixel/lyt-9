@@ -29,6 +29,9 @@ export const useBudgetStore = defineStore('budget', () => {
   function updateItem(id: string, updates: Partial<Omit<BudgetItem, 'id'>>) {
     const index = items.value.findIndex(item => item.id === id)
     if (index !== -1) {
+      if (items.value[index].locked && (updates.budget !== undefined || updates.planned !== undefined)) {
+        return
+      }
       const updated = { ...items.value[index], ...updates }
       if (updates.planned !== undefined && updates.budget === undefined) {
         updated.budget = updates.planned
@@ -53,6 +56,25 @@ export const useBudgetStore = defineStore('budget', () => {
     if (index !== -1) {
       items.value[index].actual = actual
     }
+  }
+
+  function lockCategory(category: string) {
+    const index = items.value.findIndex(item => item.category === category)
+    if (index !== -1) {
+      items.value[index].locked = true
+    }
+  }
+
+  function unlockCategory(category: string) {
+    const index = items.value.findIndex(item => item.category === category)
+    if (index !== -1) {
+      items.value[index].locked = false
+    }
+  }
+
+  function isCategoryLocked(category: string) {
+    const item = items.value.find(item => item.category === category)
+    return item?.locked ?? false
   }
 
   function getItemByCategory(category: string) {
@@ -95,6 +117,9 @@ export const useBudgetStore = defineStore('budget', () => {
     deleteItem,
     getItemById,
     updateActualByCategory,
+    lockCategory,
+    unlockCategory,
+    isCategoryLocked,
     getItemByCategory,
     syncContractedToBudget,
     totalBudget,

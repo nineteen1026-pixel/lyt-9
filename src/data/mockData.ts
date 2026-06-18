@@ -5,6 +5,7 @@ export interface BudgetItem {
   actual: number
   color: string
   budget: number
+  locked?: boolean
 }
 
 export type GuestStatus = 'confirmed' | 'pending' | 'declined'
@@ -149,7 +150,7 @@ export interface Notice {
 }
 
 export const mockBudget: BudgetItem[] = [
-  { id: '1', category: '场地', planned: 50000, actual: 48000, color: '#FF6B6B', budget: 50000 },
+  { id: '1', category: '场地', planned: 50000, actual: 48000, color: '#FF6B6B', budget: 50000, locked: true },
   { id: '2', category: '餐饮', planned: 80000, actual: 78000, color: '#4ECDC4', budget: 80000 },
   { id: '3', category: '婚纱', planned: 15000, actual: 16800, color: '#45B7D1', budget: 15000 },
   { id: '4', category: '摄影', planned: 12000, actual: 11500, color: '#96CEB4', budget: 12000 },

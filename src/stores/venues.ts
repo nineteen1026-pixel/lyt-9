@@ -48,6 +48,7 @@ export const useVenuesStore = defineStore('venues', () => {
       venues.value[index].status = 'booked'
 
       budgetStore.updateActualByCategory('场地', contractPrice)
+      budgetStore.lockCategory('场地')
     }
   }
 
@@ -60,6 +61,7 @@ export const useVenuesStore = defineStore('venues', () => {
       venues.value[index].status = 'alternative'
 
       budgetStore.updateActualByCategory('场地', 0)
+      budgetStore.unlockCategory('场地')
     }
   }
 
@@ -67,12 +69,17 @@ export const useVenuesStore = defineStore('venues', () => {
     const budgetStore = useBudgetStore()
     const index = venues.value.findIndex(venue => venue.id === id)
     if (index !== -1) {
+      const deletedVenue = venues.value[index]
       venues.value.splice(index, 1)
 
       const totalContracted = venues.value
         .filter(v => v.contracted)
         .reduce((sum, v) => sum + v.contractPrice, 0)
       budgetStore.updateActualByCategory('场地', totalContracted)
+
+      if (deletedVenue.contracted && totalContracted === 0) {
+        budgetStore.unlockCategory('场地')
+      }
     }
   }
 

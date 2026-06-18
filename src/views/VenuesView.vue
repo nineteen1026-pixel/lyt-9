@@ -1,8 +1,8 @@
 <script setup lang="ts">
-import { ref } from 'vue'
+import { ref, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { useVenuesStore, type VenueStatus } from '@/stores/venues'
-import { MapPin, Users, Tag, CheckCircle, Star, X, FileSignature } from 'lucide-vue-next'
+import { MapPin, Users, Tag, CheckCircle, Star, X, FileSignature, Ban } from 'lucide-vue-next'
 import Toast from '@/components/Toast.vue'
 
 const router = useRouter()
@@ -69,6 +69,10 @@ const confirmContract = () => {
   }
 }
 
+const hasBookedVenue = computed(() => {
+  return venuesStore.venues.some(v => v.contracted)
+})
+
 const cancelContract = (venueId: string) => {
   venuesStore.cancelContractVenue(venueId)
   showToast('已取消签约', '', 'info')
@@ -89,6 +93,7 @@ const cancelContract = (venueId: string) => {
             v-for="(venue, index) in venuesStore.venues" 
             :key="venue.id"
             class="animate-slide-up bg-white rounded-2xl overflow-hidden shadow-md hover:shadow-xl transition-all duration-500 hover:-translate-y-1"
+            :class="{ 'opacity-60 grayscale pointer-events-none': !venue.contracted && hasBookedVenue, 'hover:shadow-xl hover:-translate-y-1': venue.contracted || !hasBookedVenue, 'hover:shadow-none hover:translate-y-0': !venue.contracted && hasBookedVenue }"
             :style="{ animationDelay: `${0.1 + index * 0.15}s` }"
           >
             <div class="relative">
@@ -155,17 +160,23 @@ const cancelContract = (venueId: string) => {
               </div>
 
               <div v-else class="mt-4">
-                <div class="flex items-center gap-2 p-3 bg-champagne-100 rounded-xl mb-3">
-                  <Star class="w-5 h-5 text-champagne-300" />
-                  <span class="text-sm text-champagne-300 font-medium">备选场地，可签约预订</span>
+                <div v-if="hasBookedVenue" class="flex items-center gap-2 p-3 bg-gray-100 rounded-xl">
+                  <Ban class="w-5 h-5 text-gray-400" />
+                  <span class="text-sm text-gray-500 font-medium">已选定其他场地</span>
                 </div>
-                <button 
-                  @click="openContractModal(venue.id, venue.price)"
-                  class="w-full py-3 bg-gradient-to-r from-primary-400 to-primary-500 text-white rounded-xl font-medium flex items-center justify-center gap-2 hover:shadow-lg transition-all duration-300"
-                >
-                  <FileSignature class="w-5 h-5" />
-                  立即签约
-                </button>
+                <template v-else>
+                  <div class="flex items-center gap-2 p-3 bg-champagne-100 rounded-xl mb-3">
+                    <Star class="w-5 h-5 text-champagne-300" />
+                    <span class="text-sm text-champagne-300 font-medium">备选场地，可签约预订</span>
+                  </div>
+                  <button 
+                    @click="openContractModal(venue.id, venue.price)"
+                    class="w-full py-3 bg-gradient-to-r from-primary-400 to-primary-500 text-white rounded-xl font-medium flex items-center justify-center gap-2 hover:shadow-lg transition-all duration-300"
+                  >
+                    <FileSignature class="w-5 h-5" />
+                    立即签约
+                  </button>
+                </template>
               </div>
             </div>
           </div>

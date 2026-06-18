@@ -4,7 +4,7 @@ import { useBudgetStore } from '@/stores/budget'
 import { useGuestsStore } from '@/stores/guests'
 import PieChart from '@/components/PieChart.vue'
 import Toast from '@/components/Toast.vue'
-import { Wallet, TrendingDown, TrendingUp, Target, AlertTriangle, Info } from 'lucide-vue-next'
+import { Wallet, TrendingDown, TrendingUp, Target, AlertTriangle, Info, Lock } from 'lucide-vue-next'
 
 const budgetStore = useBudgetStore()
 const guestsStore = useGuestsStore()
@@ -144,19 +144,25 @@ const getDifferenceIcon = (diff: number) => {
               v-for="(item, index) in budgetStore.items" 
               :key="item.id"
               class="bg-white rounded-xl p-4 shadow-sm hover:shadow-md transition-all duration-300"
-              :class="{ 'ring-2 ring-red-400 bg-red-50': isOverBudget(item.budget, item.actual) }"
+              :class="{ 'ring-2 ring-red-400 bg-red-50': isOverBudget(item.budget, item.actual), 'ring-2 ring-primary-300 bg-primary-50/50': item.locked }"
               :style="{ animationDelay: `${0.8 + index * 0.1}s` }"
             >
               <div class="flex items-center justify-between">
                 <div class="flex items-center gap-3">
                   <div 
-                    class="w-10 h-10 rounded-xl flex items-center justify-center"
+                    class="w-10 h-10 rounded-xl flex items-center justify-center relative"
                     :style="{ backgroundColor: item.color + '20' }"
                   >
                     <div class="w-3 h-3 rounded-full" :style="{ backgroundColor: item.color }"></div>
+                    <div v-if="item.locked" class="absolute -top-1 -right-1 w-4 h-4 bg-primary-500 rounded-full flex items-center justify-center">
+                      <Lock class="w-2.5 h-2.5 text-white" />
+                    </div>
                   </div>
                   <div>
-                    <p class="font-medium" :class="isOverBudget(item.budget, item.actual) ? 'text-red-600' : 'text-gray-800'">{{ item.category }}</p>
+                    <div class="flex items-center gap-1.5">
+                      <p class="font-medium" :class="isOverBudget(item.budget, item.actual) ? 'text-red-600' : 'text-gray-800'">{{ item.category }}</p>
+                      <span v-if="item.locked" class="text-xs text-primary-500 bg-primary-100 px-1.5 py-0.5 rounded-full">已锁定</span>
+                    </div>
                     <p class="text-xs" :class="isOverBudget(item.budget, item.actual) ? 'text-red-400' : 'text-gray-400'">预算: {{ formatCurrency(item.budget) }}</p>
                   </div>
                 </div>
