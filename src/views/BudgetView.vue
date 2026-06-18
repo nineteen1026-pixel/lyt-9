@@ -1,10 +1,28 @@
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { useBudgetStore } from '@/stores/budget'
+import { useGuestsStore } from '@/stores/guests'
 import PieChart from '@/components/PieChart.vue'
-import { Wallet, TrendingDown, TrendingUp, Target } from 'lucide-vue-next'
+import Toast from '@/components/Toast.vue'
+import { Wallet, TrendingDown, TrendingUp, Target, AlertTriangle } from 'lucide-vue-next'
 
 const budgetStore = useBudgetStore()
+const guestsStore = useGuestsStore()
+
+const toastVisible = ref(false)
+const toastMessage = ref('')
+const toastDescription = ref('')
+
+onMounted(() => {
+  if (guestsStore.capacityWarning) {
+    toastMessage.value = guestsStore.capacityWarning.title
+    toastDescription.value = guestsStore.capacityWarning.content
+    toastVisible.value = true
+    setTimeout(() => {
+      toastVisible.value = false
+    }, 5000)
+  }
+})
 
 const formatCurrency = (value: number) => {
   return `¥${value.toLocaleString()}`
@@ -50,6 +68,17 @@ const getDifferenceIcon = (diff: number) => {
       </div>
 
       <div class="px-4 -mt-10">
+        <div v-if="guestsStore.capacityWarning" class="animate-slide-up mb-4 bg-red-50 border-2 border-red-300 rounded-2xl p-4 shadow-md" style="animation-delay: 0.05s">
+          <div class="flex items-start gap-3">
+            <div class="w-10 h-10 rounded-full bg-red-100 flex items-center justify-center flex-shrink-0">
+              <AlertTriangle class="w-6 h-6 text-red-500" />
+            </div>
+            <div class="flex-1">
+              <p class="font-bold text-red-700">{{ guestsStore.capacityWarning.title }}</p>
+              <p class="text-sm text-red-600 mt-1">{{ guestsStore.capacityWarning.content }}</p>
+            </div>
+          </div>
+        </div>
         <div class="grid grid-cols-2 gap-3 mb-6">
           <div class="animate-slide-up bg-white rounded-2xl p-4 shadow-md" style="animation-delay: 0.1s">
             <div class="flex items-center gap-2 mb-2">
@@ -150,5 +179,12 @@ const getDifferenceIcon = (diff: number) => {
         </div>
       </div>
     </div>
+
+    <Toast 
+      :visible="toastVisible" 
+      :message="toastMessage" 
+      :description="toastDescription"
+      type="warning" 
+    />
   </div>
 </template>

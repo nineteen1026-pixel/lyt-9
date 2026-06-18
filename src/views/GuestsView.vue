@@ -1,12 +1,32 @@
 <script setup lang="ts">
 import { ref, computed } from 'vue'
 import { useGuestsStore, type Guest, type GuestStatus, type GuestGroup } from '@/stores/guests'
-import { Search, Users, CheckCircle, Clock, XCircle, Utensils } from 'lucide-vue-next'
+import { Search, Users, CheckCircle, Clock, XCircle, Utensils, Edit3, X, AlertTriangle } from 'lucide-vue-next'
+import Toast from '@/components/Toast.vue'
 
 const guestsStore = useGuestsStore()
 const searchQuery = ref('')
 const activeFilter = ref<GuestStatus | 'all'>('all')
 const activeGroup = ref<GuestGroup | 'all'>('all')
+
+const showTableModal = ref(false)
+const selectedGuest = ref<Guest | null>(null)
+const editingTableNumber = ref<number | null>(null)
+
+const toastVisible = ref(false)
+const toastMessage = ref('')
+const toastDescription = ref('')
+const toastType = ref<'success' | 'error' | 'warning' | 'info'>('success')
+
+const showToast = (message: string, description?: string, type: 'success' | 'error' | 'warning' | 'info' = 'success', duration = 3000) => {
+  toastMessage.value = message
+  toastDescription.value = description ?? ''
+  toastType.value = type
+  toastVisible.value = true
+  setTimeout(() => {
+    toastVisible.value = false
+  }, duration)
+}
 
 const statusFilters: { key: GuestStatus | 'all'; label: string; icon: typeof Users }[] = [
   { key: 'all', label: '全部', icon: Users },
@@ -61,6 +81,41 @@ const getAvatarColor = (name: string) => {
   const index = name.charCodeAt(0) % colors.length
   return colors[index]
 }
+
+const openTableModal = (guest: Guest) => {
+  selectedGuest.value = guest
+  editingTableNumber.value = guest.tableNumber
+  showTableModal.value = true
+}
+
+const closeTableModal = () => {
+  showTableModal.value = false
+  selectedGuest.value = null
+  editingTableNumber.value = null
+}
+
+const saveTableNumber = () => {
+  if (!selectedGuest.value) return
+
+  const tableNum = editingTableNumber.value
+  const result = guestsStore.updateGuestTable(selectedGuest.value.id, tableNum)
+
+  if (!result.valid) {
+    showToast('分桌保存失败', result.message, 'error', 4000)
+    return
+  }
+
+  if (tableNum === null) {
+    showToast('已取消分桌', `${selectedGuest.value.name} 的分桌已取消`, 'info')
+  } else {
+    showToast('分桌保存成功', `${selectedGuest.value.name} 已分配到 ${tableNum}号桌`, 'success')
+  }
+  closeTableModal()
+}
+
+const clearTableNumber = () => {
+  editingTableNumber.value = null
+}
 </script>
 
 <template>
@@ -72,7 +127,7 @@ const getAvatarColor = (name: string) => {
       </div>
 
       <div class="px-4 -mt-10">
-        <div class="grid grid-cols-3 gap-3 mb-6">
+        <div class="grid grid-cols-4 gap-3 mb-6">
           <div class="animate-slide-up bg-white rounded-2xl p-3 shadow-md text-center" style="animation-delay: 0.1s">
             <p class="text-2xl font-bold text-primary-500">{{ guestsStore.totalCount }}</p>
             <p class="text-xs text-gray-500">总人数</p>
@@ -81,9 +136,25 @@ const getAvatarColor = (name: string) => {
             <p class="text-2xl font-bold text-green-500">{{ guestsStore.confirmedCount }}</p>
             <p class="text-xs text-gray-500">已确认</p>
           </div>
+          <div class="animate-slide-up bg-white rounded-2xl p-3 shadow-md text-center" style="animation-delay: 0.25s">
+            <p class="text-2xl font-bold" :class="guestsStore.isOverCapacity ? 'text-red-500' : 'text-primary-500'">
+              {{ guestsStore.assignedGuestsCount }}/{{ guestsStore.bookedVenueCapacity }}
+            </p>
+            <p class="text-xs text-gray-500">已分配/场地容量</p>
+          </div>
           <div class="animate-slide-up bg-white rounded-2xl p-3 shadow-md text-center" style="animation-delay: 0.3s">
             <p class="text-2xl font-bold text-red-500">{{ guestsStore.declinedCount }}</p>
             <p class="text-xs text-gray-500">缺席</p>
+          </div>
+        </div>
+
+        <div v-if="guestsStore.capacityWarning" class="animate-slide-up mb-4 bg-red-50 border border-red-200 rounded-2xl p-4 shadow-sm" style="animation-delay: 0.35s">
+          <div class="flex items-start gap-3">
+            <AlertTriangle class="w-6 h-6 text-red-500 flex-shrink-0 mt-0.5" />
+            <div>
+              <p class="font-medium text-red-700">{{ guestsStore.capacityWarning.title }}</p>
+              <p class="text-sm text-red-600 mt-1">{{ guestsStore.capacityWarning.content }}</p>
+            </div>
           </div>
         </div>
 
@@ -159,6 +230,15 @@ const getAvatarColor = (name: string) => {
                   </span>
                 </div>
               </div>
+              <button 
+                @click="openTableModal(guest)"
+                class="w-10 h-10 rounded-full bg-primary-50 flex items-center justify-center text-primary-500 hover:bg-primary-100 transition-colors"
+                :disabled="guest.status === 'declined'"
+                :class="{ 'opacity-50 cursor-not-allowed': guest.status === 'declined' }"
+                :title="guest.status === 'declined' ? '缺席宾客无需分桌' : '编辑分桌'"
+              >
+                <Edit3 class="w-4 h-4" />
+              </button>
             </div>
           </div>
         </div>
@@ -169,5 +249,96 @@ const getAvatarColor = (name: string) => {
         </div>
       </div>
     </div>
+
+    <Teleport to="body">
+      <div v-if="showTableModal" class="fixed inset-0 z-50 flex items-center justify-center p-4">
+        <div class="absolute inset-0 bg-black/50 backdrop-blur-sm" @click="closeTableModal"></div>
+        <div class="relative bg-white rounded-3xl p-6 w-full max-w-md animate-fade-in shadow-2xl">
+          <button 
+            @click="closeTableModal"
+            class="absolute top-4 right-4 w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center hover:bg-gray-200 transition-colors"
+          >
+            <X class="w-5 h-5 text-gray-500" />
+          </button>
+          
+          <div class="text-center mb-6">
+            <div class="w-16 h-16 rounded-full bg-primary-100 flex items-center justify-center mx-auto mb-4">
+              <Utensils class="w-8 h-8 text-primary-500" />
+            </div>
+            <h3 class="text-xl font-bold text-gray-800">编辑分桌</h3>
+            <p class="text-sm text-gray-500 mt-1">{{ selectedGuest?.name }}</p>
+          </div>
+
+          <div class="space-y-4">
+            <div v-if="selectedGuest?.status !== 'confirmed'" class="p-4 bg-yellow-50 rounded-xl">
+              <p class="text-sm text-yellow-700">
+                <AlertTriangle class="w-4 h-4 inline mr-1" />
+                该宾客状态为「{{ getStatusConfig(selectedGuest?.status || 'pending').label }}」，分桌后不计入场地容量统计。
+              </p>
+            </div>
+
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-2">桌号</label>
+              <input 
+                v-model.number="editingTableNumber"
+                type="number"
+                min="1"
+                class="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-primary-400 focus:outline-none transition-colors text-lg font-medium text-center"
+                placeholder="输入桌号，留空表示取消分桌"
+              />
+              <button 
+                v-if="editingTableNumber !== null"
+                @click="clearTableNumber"
+                class="mt-2 w-full py-2 text-sm text-gray-500 hover:text-red-500 transition-colors"
+              >
+                清除桌号，取消分桌
+              </button>
+            </div>
+
+            <div class="bg-gray-50 rounded-xl p-4">
+              <div class="flex justify-between text-sm">
+                <span class="text-gray-500">已分配人数</span>
+                <span class="font-medium" :class="guestsStore.isOverCapacity ? 'text-red-500' : 'text-gray-800'">
+                  {{ guestsStore.assignedGuestsCount }} / {{ guestsStore.bookedVenueCapacity }} 人
+                </span>
+              </div>
+              <div class="w-full bg-gray-200 rounded-full h-2 mt-2 overflow-hidden">
+                <div 
+                  class="h-full rounded-full transition-all duration-300"
+                  :class="guestsStore.isOverCapacity ? 'bg-red-500' : 'bg-primary-500'"
+                  :style="{ width: `${Math.min((guestsStore.assignedGuestsCount / guestsStore.bookedVenueCapacity) * 100, 100)}%` }"
+                ></div>
+              </div>
+              <p v-if="guestsStore.isOverCapacity" class="text-xs text-red-500 mt-2">
+                <AlertTriangle class="w-3 h-3 inline mr-1" />
+                当前已超出场地容量 {{ guestsStore.capacityOverflow }} 人
+              </p>
+            </div>
+
+            <div class="flex gap-3 pt-4">
+              <button 
+                @click="closeTableModal"
+                class="flex-1 py-3 border-2 border-gray-200 text-gray-600 rounded-xl font-medium hover:bg-gray-50 transition-colors"
+              >
+                取消
+              </button>
+              <button 
+                @click="saveTableNumber"
+                class="flex-1 py-3 bg-gradient-to-r from-primary-400 to-primary-500 text-white rounded-xl font-medium hover:shadow-lg transition-all duration-300"
+              >
+                保存
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </Teleport>
+
+    <Toast 
+      :visible="toastVisible" 
+      :message="toastMessage" 
+      :description="toastDescription"
+      :type="toastType" 
+    />
   </div>
 </template>
