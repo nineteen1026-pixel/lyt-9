@@ -1,16 +1,32 @@
 <script setup lang="ts">
 import { ref, computed } from 'vue'
 import { useRouter } from 'vue-router'
-import { useVenuesStore, type VenueStatus } from '@/stores/venues'
-import { MapPin, Users, Tag, CheckCircle, Star, X, FileSignature, Ban } from 'lucide-vue-next'
+import { useVenuesStore, type Venue } from '@/stores/venues'
+import { useBudgetStore } from '@/stores/budget'
+import { MapPin, Users, Tag, Plus, Filter, ArrowUpDown, SlidersHorizontal, ArrowLeftRight } from 'lucide-vue-next'
+import OptionCard from '@/components/OptionCard.vue'
+import OptionFormModal from '@/components/OptionFormModal.vue'
+import CompareModal from '@/components/CompareModal.vue'
+import ConfirmSelectionModal from '@/components/ConfirmSelectionModal.vue'
 import Toast from '@/components/Toast.vue'
 
 const router = useRouter()
 const venuesStore = useVenuesStore()
+const budgetStore = useBudgetStore()
 
-const showContractModal = ref(false)
-const selectedVenueId = ref<string | null>(null)
-const contractPrice = ref(0)
+const showFormModal = ref(false)
+const showCompareModal = ref(false)
+const showConfirmModal = ref(false)
+const editVenue = ref<Venue | null>(null)
+const selectedForConfirm = ref<Venue | null>(null)
+const compareIds = ref<string[]>([])
+
+type SortKey = 'createdAt' | 'price' | 'rating'
+type FilterStatus = 'all' | 'contracted' | 'alternative'
+const sortKey = ref<SortKey>('createdAt')
+const sortDesc = ref(true)
+const filterStatus = ref<FilterStatus>('all')
+const showFilter = ref(false)
 
 const toastVisible = ref(false)
 const toastMessage = ref('')
@@ -27,220 +43,353 @@ const showToast = (message: string, description?: string, type: 'success' | 'err
   }, duration)
 }
 
-const getStatusConfig = (status: VenueStatus) => {
-  switch (status) {
-    case 'booked':
-      return { label: '已预订', class: 'bg-primary-500 text-white' }
-    case 'alternative':
-      return { label: '备选', class: 'bg-champagne-200 text-champagne-300' }
+const formatPrice = (price: number) => `¥${price.toLocaleString()}`
+
+const hasBookedVenue = computed(() => venuesStore.venues.some(v => v.contracted))
+
+const sortedVenues = computed(() => {
+  let list = [...venuesStore.venues]
+  if (filterStatus.value === 'contracted') {
+    list = list.filter(v => v.contracted)
+  } else if (filterStatus.value === 'alternative') {
+    list = list.filter(v => !v.contracted)
   }
-}
-
-const formatPrice = (price: number) => {
-  return `¥${price.toLocaleString()}`
-}
-
-const openContractModal = (venueId: string, currentPrice: number) => {
-  selectedVenueId.value = venueId
-  contractPrice.value = currentPrice
-  showContractModal.value = true
-}
-
-const closeContractModal = () => {
-  showContractModal.value = false
-  selectedVenueId.value = null
-  contractPrice.value = 0
-}
-
-const confirmContract = () => {
-  if (selectedVenueId.value && contractPrice.value > 0) {
-    const venue = venuesStore.getVenueById(selectedVenueId.value)
-    venuesStore.updateContractVenue(selectedVenueId.value, contractPrice.value)
-    closeContractModal()
-    showToast(
-      '场地签约成功！',
-      `${venue?.name ?? ''} 已签约 ${formatPrice(contractPrice.value)}`,
-      'success',
-      2000
-    )
-    setTimeout(() => {
-      router.push('/budget')
-    }, 1500)
-  }
-}
-
-const hasBookedVenue = computed(() => {
-  return venuesStore.venues.some(v => v.contracted)
+  list.sort((a, b) => {
+    let diff = 0
+    switch (sortKey.value) {
+      case 'price':
+        diff = a.price - b.price
+        break
+      case 'rating':
+        diff = a.rating - b.rating
+        break
+      case 'createdAt':
+      default:
+        diff = a.createdAt - b.createdAt
+    }
+    return sortDesc.value ? -diff : diff
+  })
+  return list
 })
 
-const cancelContract = (venueId: string) => {
-  venuesStore.cancelContractVenue(venueId)
-  showToast('已取消签约', '', 'info')
+const contractedCount = computed(() => venuesStore.venues.filter(v => v.contracted).length)
+const alternativeCount = computed(() => venuesStore.venues.filter(v => !v.contracted).length)
+const totalContractedPrice = computed(() => venuesStore.venues.filter(v => v.contracted).reduce((s, v) => s + v.contractPrice, 0))
+
+const compareItems = computed(() => {
+  return compareIds.value
+    .map(id => venuesStore.getVenueById(id))
+    .filter(Boolean)
+    .map(v => ({
+      id: v!.id,
+      title: v!.name,
+      subtitle: v!.address,
+      price: v!.price,
+      rating: v!.rating,
+      pros: v!.pros,
+      cons: v!.cons,
+      image: v!.image,
+      contracted: v!.contracted,
+      extraFields: [
+        { label: '容纳人数', value: `${v!.capacity}人` },
+        { label: '地址', value: v!.address },
+        { label: '特色', value: v!.features.slice(0, 3).join('、') }
+      ]
+    }))
+})
+
+const budgetItem = computed(() => budgetStore.getItemByCategory('场地'))
+
+const openAddModal = () => {
+  editVenue.value = null
+  showFormModal.value = true
+}
+
+const openEditModal = (id: string) => {
+  const venue = venuesStore.getVenueById(id)
+  if (venue) {
+    editVenue.value = { ...venue }
+    showFormModal.value = true
+  }
+}
+
+const handleFormSubmit = (data: any) => {
+  if (editVenue.value) {
+    venuesStore.updateVenue(editVenue.value.id, data)
+    showToast('修改成功', '场地信息已更新', 'success')
+  } else {
+    venuesStore.addVenue(data)
+    showToast('添加成功', '已添加到场地方案库', 'success')
+  }
+  showFormModal.value = false
+  editVenue.value = null
+}
+
+const handleDelete = (id: string) => {
+  if (confirm('确定要删除此场地方案吗？')) {
+    const venue = venuesStore.getVenueById(id)
+    venuesStore.deleteVenue(id)
+    compareIds.value = compareIds.value.filter(i => i !== id)
+    showToast('已删除', venue?.name ?? '', 'info')
+  }
+}
+
+const openConfirmModal = (id: string) => {
+  const venue = venuesStore.getVenueById(id)
+  if (venue) {
+    selectedForConfirm.value = venue
+    showConfirmModal.value = true
+  }
+}
+
+const handleConfirmSelection = (_id: string, price: number) => {
+  if (!selectedForConfirm.value) return
+  const id = selectedForConfirm.value.id
+  const venueName = selectedForConfirm.value.name
+  venuesStore.updateContractVenue(id, price)
+  showConfirmModal.value = false
+  showCompareModal.value = false
+  compareIds.value = []
+  selectedForConfirm.value = null
+  showToast('选型确认成功！', `${venueName} ${formatPrice(price)} 已写入预算`, 'success', 2500)
+  setTimeout(() => {
+    router.push('/budget')
+  }, 1800)
+}
+
+const handleCancelContract = (id: string) => {
+  venuesStore.cancelContractVenue(id)
+  showToast('已取消签约', '预算已同步更新', 'info')
+}
+
+const toggleCompare = (id: string) => {
+  const idx = compareIds.value.indexOf(id)
+  if (idx >= 0) {
+    compareIds.value.splice(idx, 1)
+  } else {
+    if (compareIds.value.length >= 4) {
+      showToast('最多对比4个方案', '请先移除部分方案', 'warning')
+      return
+    }
+    compareIds.value.push(id)
+  }
+}
+
+const removeFromCompare = (id: string) => {
+  compareIds.value = compareIds.value.filter(i => i !== id)
+}
+
+const selectFromCompare = (id: string) => {
+  openConfirmModal(id)
+}
+
+const toggleSortDesc = () => {
+  sortDesc.value = !sortDesc.value
 }
 </script>
 
 <template>
   <div class="min-h-screen bg-gradient-to-br from-primary-50 via-ivory to-champagne-100 pb-20">
     <div class="animate-fade-in">
-      <div class="bg-gradient-to-r from-primary-400 to-primary-500 px-6 pt-12 pb-16 rounded-b-3xl shadow-lg">
-        <h1 class="text-3xl font-serif font-bold text-white text-center">婚礼场地</h1>
-        <p class="text-primary-100 text-center mt-2">甄选场地，铭记时刻</p>
-      </div>
+      <div class="bg-gradient-to-r from-primary-400 to-primary-500 px-6 pt-12 pb-20 rounded-b-3xl shadow-lg relative overflow-hidden">
+        <div class="absolute inset-0 opacity-10">
+          <div class="absolute -top-20 -right-20 w-64 h-64 rounded-full bg-white"></div>
+          <div class="absolute -bottom-10 -left-10 w-48 h-48 rounded-full bg-white"></div>
+        </div>
+        <div class="relative z-10">
+          <h1 class="text-3xl font-serif font-bold text-white text-center">婚礼场地</h1>
+          <p class="text-primary-100 text-center mt-2">多方案甄选，定格完美场地</p>
 
-      <div class="px-4 -mt-10">
-        <div class="space-y-4">
-          <div 
-            v-for="(venue, index) in venuesStore.venues" 
-            :key="venue.id"
-            class="animate-slide-up bg-white rounded-2xl overflow-hidden shadow-md hover:shadow-xl transition-all duration-500 hover:-translate-y-1"
-            :class="{ 'opacity-60 grayscale pointer-events-none': !venue.contracted && hasBookedVenue, 'hover:shadow-xl hover:-translate-y-1': venue.contracted || !hasBookedVenue, 'hover:shadow-none hover:translate-y-0': !venue.contracted && hasBookedVenue }"
-            :style="{ animationDelay: `${0.1 + index * 0.15}s` }"
-          >
-            <div class="relative">
-              <img 
-                :src="venue.image" 
-                :alt="venue.name"
-                class="w-full h-48 object-cover"
-              />
-              <div class="absolute top-3 right-3">
-                <span 
-                  class="px-3 py-1 rounded-full text-xs font-medium"
-                  :class="getStatusConfig(venue.status).class"
-                >
-                  {{ getStatusConfig(venue.status).label }}
-                </span>
-              </div>
-              <div class="absolute bottom-0 left-0 right-0 h-20 bg-gradient-to-t from-black/50 to-transparent"></div>
-              <div class="absolute bottom-3 left-4 right-4">
-                <h3 class="text-lg font-bold text-white">{{ venue.name }}</h3>
-              </div>
+          <div class="grid grid-cols-3 gap-3 mt-6">
+            <div class="bg-white/15 backdrop-blur-sm rounded-2xl p-3 text-center">
+              <p class="text-2xl font-bold text-white">{{ venuesStore.venues.length }}</p>
+              <p class="text-xs text-primary-100 mt-0.5">方案总数</p>
             </div>
-            
-            <div class="p-4">
-              <div class="flex items-center gap-2 text-gray-500 text-sm mb-3">
-                <MapPin class="w-4 h-4 text-primary-400" />
-                <span class="truncate">{{ venue.address }}</span>
-              </div>
-              
-              <div class="flex items-center gap-4 mb-4">
-                <div class="flex items-center gap-1.5 text-sm text-gray-600">
-                  <Users class="w-4 h-4 text-champagne-300" />
-                  <span>容纳{{ venue.capacity }}人</span>
-                </div>
-                <div class="flex items-center gap-1.5 text-sm text-gray-600">
-                  <Tag class="w-4 h-4 text-primary-400" />
-                  <span>{{ formatPrice(venue.price) }}</span>
-                </div>
-              </div>
-
-              <div class="flex flex-wrap gap-2">
-                <span 
-                  v-for="feature in venue.features" 
-                  :key="feature"
-                  class="px-2.5 py-1 bg-primary-50 text-primary-400 rounded-full text-xs"
-                >
-                  {{ feature }}
-                </span>
-              </div>
-
-              <div v-if="venue.contracted" class="mt-4 flex items-center justify-between gap-2 p-3 bg-green-50 rounded-xl">
-                <div class="flex items-center gap-2">
-                  <CheckCircle class="w-5 h-5 text-green-500" />
-                  <div>
-                    <span class="text-sm text-green-600 font-medium">已签约</span>
-                    <p class="text-xs text-green-500">签约金额: {{ formatPrice(venue.contractPrice) }}</p>
-                  </div>
-                </div>
-                <button 
-                  @click="cancelContract(venue.id)"
-                  class="px-3 py-1.5 text-xs bg-white text-red-500 rounded-lg border border-red-200 hover:bg-red-50 transition-colors"
-                >
-                  取消签约
-                </button>
-              </div>
-
-              <div v-else class="mt-4">
-                <div v-if="hasBookedVenue" class="flex items-center gap-2 p-3 bg-gray-100 rounded-xl">
-                  <Ban class="w-5 h-5 text-gray-400" />
-                  <span class="text-sm text-gray-500 font-medium">已选定其他场地</span>
-                </div>
-                <template v-else>
-                  <div class="flex items-center gap-2 p-3 bg-champagne-100 rounded-xl mb-3">
-                    <Star class="w-5 h-5 text-champagne-300" />
-                    <span class="text-sm text-champagne-300 font-medium">备选场地，可签约预订</span>
-                  </div>
-                  <button 
-                    @click="openContractModal(venue.id, venue.price)"
-                    class="w-full py-3 bg-gradient-to-r from-primary-400 to-primary-500 text-white rounded-xl font-medium flex items-center justify-center gap-2 hover:shadow-lg transition-all duration-300"
-                  >
-                    <FileSignature class="w-5 h-5" />
-                    立即签约
-                  </button>
-                </template>
-              </div>
+            <div class="bg-white/15 backdrop-blur-sm rounded-2xl p-3 text-center">
+              <p class="text-2xl font-bold text-white">{{ contractedCount }}</p>
+              <p class="text-xs text-primary-100 mt-0.5">已确认</p>
             </div>
+            <div class="bg-white/15 backdrop-blur-sm rounded-2xl p-3 text-center">
+              <p class="text-2xl font-bold text-white">{{ alternativeCount }}</p>
+              <p class="text-xs text-primary-100 mt-0.5">待选方案</p>
+            </div>
+          </div>
+
+          <div v-if="totalContractedPrice > 0" class="mt-4 bg-white/20 backdrop-blur-sm rounded-2xl p-3 text-center">
+            <p class="text-sm text-primary-50">已确认合同金额</p>
+            <p class="text-xl font-bold text-white mt-0.5">{{ formatPrice(totalContractedPrice) }}</p>
           </div>
         </div>
       </div>
 
-      <Teleport to="body">
-        <div v-if="showContractModal" class="fixed inset-0 z-50 flex items-center justify-center p-4">
-          <div class="absolute inset-0 bg-black/50 backdrop-blur-sm" @click="closeContractModal"></div>
-          <div class="relative bg-white rounded-3xl p-6 w-full max-w-md animate-fade-in shadow-2xl">
-            <button 
-              @click="closeContractModal"
-              class="absolute top-4 right-4 w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center hover:bg-gray-200 transition-colors"
+      <div class="px-4 -mt-12 relative z-20">
+        <div class="bg-white rounded-2xl shadow-lg p-4 mb-5 animate-slide-up" style="animation-delay: 0.1s">
+          <div class="flex items-center gap-3 mb-3">
+            <button
+              @click="openAddModal"
+              class="flex-1 py-3 bg-gradient-to-r from-primary-400 to-primary-500 text-white rounded-xl font-medium flex items-center justify-center gap-2 hover:shadow-md transition-all duration-300"
             >
-              <X class="w-5 h-5 text-gray-500" />
+              <Plus class="w-5 h-5" />
+              添加场地方案
             </button>
-            
-            <div class="text-center mb-6">
-              <div class="w-16 h-16 rounded-full bg-primary-100 flex items-center justify-center mx-auto mb-4">
-                <FileSignature class="w-8 h-8 text-primary-500" />
-              </div>
-              <h3 class="text-xl font-bold text-gray-800">场地签约</h3>
-              <p class="text-sm text-gray-500 mt-1">请确认签约金额</p>
-            </div>
+            <button
+              @click="showCompareModal = true"
+              :disabled="compareIds.length < 2"
+              class="py-3 px-4 bg-champagne-100 text-champagne-400 rounded-xl font-medium flex items-center gap-2 hover:bg-champagne-200 transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed"
+              :class="{ 'bg-primary-500 text-white hover:bg-primary-600': compareIds.length >= 2 }"
+            >
+              <ArrowLeftRight class="w-5 h-5" />
+              <span class="text-sm">{{ compareIds.length >= 2 ? `对比(${compareIds.length})` : '对比' }}</span>
+            </button>
+            <button
+              @click="showFilter = !showFilter"
+              class="py-3 px-4 bg-gray-100 text-gray-600 rounded-xl font-medium flex items-center gap-2 hover:bg-gray-200 transition-all duration-300"
+              :class="{ 'bg-primary-100 text-primary-500': showFilter }"
+            >
+              <SlidersHorizontal class="w-5 h-5" />
+            </button>
+          </div>
 
-            <div class="space-y-4">
-              <div>
-                <label class="block text-sm font-medium text-gray-700 mb-2">签约金额</label>
-                <div class="relative">
-                  <span class="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500 font-medium">¥</span>
-                  <input 
-                    v-model.number="contractPrice"
-                    type="number"
-                    class="w-full pl-10 pr-4 py-3 border-2 border-gray-200 rounded-xl focus:border-primary-400 focus:outline-none transition-colors text-lg font-medium"
-                    placeholder="请输入签约金额"
-                  />
-                </div>
-              </div>
-
-              <div class="flex gap-3 pt-4">
-                <button 
-                  @click="closeContractModal"
-                  class="flex-1 py-3 border-2 border-gray-200 text-gray-600 rounded-xl font-medium hover:bg-gray-50 transition-colors"
+          <div v-if="showFilter" class="space-y-3 pt-3 border-t border-gray-100 animate-fade-in">
+            <div class="flex items-center gap-3">
+              <Filter class="w-4 h-4 text-gray-500 flex-shrink-0" />
+              <span class="text-sm text-gray-600 font-medium">状态:</span>
+              <div class="flex gap-2 flex-wrap">
+                <button
+                  v-for="s in ([
+                    { key: 'all', label: '全部' },
+                    { key: 'contracted', label: '已确认' },
+                    { key: 'alternative', label: '备选' }
+                  ] as const)"
+                  :key="s.key"
+                  @click="filterStatus = s.key"
+                  class="px-3 py-1.5 text-xs rounded-lg transition-colors"
+                  :class="filterStatus === s.key
+                    ? 'bg-primary-500 text-white'
+                    : 'bg-gray-100 text-gray-600 hover:bg-gray-200'"
                 >
-                  取消
+                  {{ s.label }}
                 </button>
-                <button 
-                  @click="confirmContract"
-                  :disabled="contractPrice <= 0"
-                  class="flex-1 py-3 bg-gradient-to-r from-primary-400 to-primary-500 text-white rounded-xl font-medium hover:shadow-lg transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed"
+              </div>
+            </div>
+            <div class="flex items-center gap-3">
+              <ArrowUpDown class="w-4 h-4 text-gray-500 flex-shrink-0" />
+              <span class="text-sm text-gray-600 font-medium">排序:</span>
+              <div class="flex gap-2 flex-wrap items-center">
+                <button
+                  v-for="s in ([
+                    { key: 'createdAt', label: '添加时间' },
+                    { key: 'price', label: '价格' },
+                    { key: 'rating', label: '评分' }
+                  ] as const)"
+                  :key="s.key"
+                  @click="sortKey = s.key"
+                  class="px-3 py-1.5 text-xs rounded-lg transition-colors"
+                  :class="sortKey === s.key
+                    ? 'bg-primary-500 text-white'
+                    : 'bg-gray-100 text-gray-600 hover:bg-gray-200'"
                 >
-                  确认签约
+                  {{ s.label }}
+                </button>
+                <button
+                  @click="toggleSortDesc"
+                  class="px-2 py-1.5 text-xs bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors text-gray-600"
+                >
+                  {{ sortDesc ? '↓ 降序' : '↑ 升序' }}
                 </button>
               </div>
             </div>
           </div>
         </div>
-      </Teleport>
 
-      <Toast 
-        :visible="toastVisible" 
-        :message="toastMessage" 
+        <div v-if="sortedVenues.length === 0" class="bg-white rounded-2xl p-10 text-center shadow-md animate-fade-in">
+          <div class="w-20 h-20 rounded-full bg-gray-100 flex items-center justify-center mx-auto mb-4">
+            <MapPin class="w-10 h-10 text-gray-400" />
+          </div>
+          <h3 class="text-lg font-bold text-gray-700 mb-2">暂无场地方案</h3>
+          <p class="text-sm text-gray-500 mb-5">点击上方"添加场地方案"开始建立你的备选库</p>
+          <button
+            @click="openAddModal"
+            class="py-3 px-6 bg-gradient-to-r from-primary-400 to-primary-500 text-white rounded-xl font-medium inline-flex items-center gap-2 hover:shadow-md transition-all duration-300"
+          >
+            <Plus class="w-5 h-5" />
+            立即添加
+          </button>
+        </div>
+
+        <div v-else class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-2 gap-4">
+          <div
+            v-for="(venue, index) in sortedVenues"
+            :key="venue.id"
+            class="animate-slide-up"
+            :style="{ animationDelay: `${0.15 + index * 0.08}s` }"
+          >
+            <OptionCard
+              :option="venue"
+              :title="venue.name"
+              :subtitle="venue.address"
+              :image="venue.image"
+              :tags="venue.features"
+              :meta-items="[
+                { icon: MapPin, label: '地址', value: venue.address },
+                { icon: Users, label: '容纳', value: `${venue.capacity}人` },
+                { icon: Tag, label: '报价', value: formatPrice(venue.price) }
+              ]"
+              :selected-for-compare="compareIds.includes(venue.id)"
+              :disabled="!venue.contracted && hasBookedVenue"
+              @sign="openConfirmModal"
+              @cancel="handleCancelContract"
+              @edit="openEditModal"
+              @delete="handleDelete"
+              @toggle-compare="toggleCompare"
+            />
+          </div>
+        </div>
+      </div>
+
+      <OptionFormModal
+        :visible="showFormModal"
+        :title="editVenue ? '编辑场地' : '添加场地方案'"
+        category="venue"
+        :edit-data="editVenue"
+        @close="showFormModal = false; editVenue = null"
+        @submit="handleFormSubmit"
+      />
+
+      <CompareModal
+        :visible="showCompareModal"
+        :items="compareItems"
+        category="场地"
+        @close="showCompareModal = false"
+        @remove="removeFromCompare"
+        @select="selectFromCompare"
+      />
+
+      <ConfirmSelectionModal
+        :visible="showConfirmModal"
+        :option="selectedForConfirm ? {
+          id: selectedForConfirm.id,
+          title: selectedForConfirm.name,
+          subtitle: selectedForConfirm.address,
+          price: selectedForConfirm.price,
+          image: selectedForConfirm.image
+        } : null"
+        category="场地"
+        budget-category="场地"
+        :current-budget="budgetItem ? {
+          planned: budgetItem.planned,
+          actual: budgetItem.actual,
+          locked: budgetItem.locked
+        } : undefined"
+        @close="showConfirmModal = false; selectedForConfirm = null"
+        @confirm="handleConfirmSelection"
+      />
+
+      <Toast
+        :visible="toastVisible"
+        :message="toastMessage"
         :description="toastDescription"
-        :type="toastType" 
+        :type="toastType"
       />
     </div>
   </div>

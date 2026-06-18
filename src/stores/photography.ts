@@ -32,7 +32,12 @@ export const usePhotographyStore = defineStore('photography', () => {
       ...item,
       id: Date.now().toString(),
       contracted: item.contracted ?? false,
-      contractPrice: item.contractPrice ?? 0
+      contractPrice: item.contractPrice ?? 0,
+      pros: item.pros ?? [],
+      cons: item.cons ?? [],
+      rating: item.rating ?? 0,
+      notes: item.notes ?? '',
+      createdAt: item.createdAt ?? Date.now()
     }
     items.value.push(newItem)
   }

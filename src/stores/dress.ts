@@ -40,7 +40,12 @@ export const useDressStore = defineStore('dress', () => {
       ...dress,
       id: Date.now().toString(),
       contracted: dress.contracted ?? false,
-      contractPrice: dress.contractPrice ?? 0
+      contractPrice: dress.contractPrice ?? 0,
+      pros: dress.pros ?? [],
+      cons: dress.cons ?? [],
+      rating: dress.rating ?? 0,
+      notes: dress.notes ?? '',
+      createdAt: dress.createdAt ?? Date.now()
     }
     dresses.value.push(newDress)
   }

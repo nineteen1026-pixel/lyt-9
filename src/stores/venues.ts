@@ -20,7 +20,12 @@ export const useVenuesStore = defineStore('venues', () => {
       ...venue,
       id: Date.now().toString(),
       contracted: venue.contracted ?? false,
-      contractPrice: venue.contractPrice ?? 0
+      contractPrice: venue.contractPrice ?? 0,
+      pros: venue.pros ?? [],
+      cons: venue.cons ?? [],
+      rating: venue.rating ?? 0,
+      notes: venue.notes ?? '',
+      createdAt: venue.createdAt ?? Date.now()
     }
     venues.value.push(newVenue)
   }

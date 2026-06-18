@@ -1,17 +1,33 @@
 <script setup lang="ts">
 import { ref, computed } from 'vue'
 import { useRouter } from 'vue-router'
-import { useDressStore, type DressCategory } from '@/stores/dress'
-import { Shirt, Ruler, Clock, ChevronRight, Tag, Palette, X, FileSignature, CheckCircle } from 'lucide-vue-next'
+import { useDressStore, type Dress, type DressCategory } from '@/stores/dress'
+import { useBudgetStore } from '@/stores/budget'
+import { Shirt, Tag, Ruler, Calendar, Palette as DressPalette, Plus, Filter, ArrowUpDown, SlidersHorizontal, ArrowLeftRight } from 'lucide-vue-next'
+import OptionCard from '@/components/OptionCard.vue'
+import OptionFormModal from '@/components/OptionFormModal.vue'
+import CompareModal from '@/components/CompareModal.vue'
+import ConfirmSelectionModal from '@/components/ConfirmSelectionModal.vue'
 import Toast from '@/components/Toast.vue'
 
 const router = useRouter()
 const dressStore = useDressStore()
-const activeCategory = ref<DressCategory>('主纱')
+const budgetStore = useBudgetStore()
 
-const showContractModal = ref(false)
-const selectedDressId = ref<string | null>(null)
-const contractPrice = ref(0)
+const showFormModal = ref(false)
+const showCompareModal = ref(false)
+const showConfirmModal = ref(false)
+const editItem = ref<Dress | null>(null)
+const selectedForConfirm = ref<Dress | null>(null)
+const compareIds = ref<string[]>([])
+
+type SortKey = 'createdAt' | 'price' | 'rating'
+type FilterStatus = 'all' | 'contracted' | 'alternative'
+const sortKey = ref<SortKey>('createdAt')
+const sortDesc = ref(true)
+const filterStatus = ref<FilterStatus>('all')
+const activeTypeTab = ref<DressCategory | 'all'>('all')
+const showFilter = ref(false)
 
 const toastVisible = ref(false)
 const toastMessage = ref('')
@@ -28,265 +44,436 @@ const showToast = (message: string, description?: string, type: 'success' | 'err
   }, duration)
 }
 
-const categories: { key: DressCategory; label: string }[] = [
-  { key: '主纱', label: '主纱' },
-  { key: '出门纱', label: '出门纱' },
-  { key: '敬酒服', label: '敬酒服' },
-]
+const formatPrice = (price: number) => `¥${price.toLocaleString()}`
 
-const filteredDresses = computed(() => {
-  return dressStore.dresses.filter(d => d.type === activeCategory.value)
+const typeGroups: DressCategory[] = ['主纱', '出门纱', '敬酒服']
+
+const sortedItems = computed(() => {
+  let list = [...dressStore.dresses]
+  if (activeTypeTab.value !== 'all') {
+    list = list.filter(d => d.type === activeTypeTab.value)
+  }
+  if (filterStatus.value === 'contracted') {
+    list = list.filter(d => d.contracted)
+  } else if (filterStatus.value === 'alternative') {
+    list = list.filter(d => !d.contracted)
+  }
+  list.sort((a, b) => {
+    let diff = 0
+    switch (sortKey.value) {
+      case 'price':
+        diff = a.price - b.price
+        break
+      case 'rating':
+        diff = a.rating - b.rating
+        break
+      case 'createdAt':
+      default:
+        diff = a.createdAt - b.createdAt
+    }
+    return sortDesc.value ? -diff : diff
+  })
+  return list
 })
 
-const formatPrice = (price: number) => {
-  return `¥${price.toLocaleString()}`
+const hasContractedByType = (type: DressCategory) =>
+  dressStore.dresses.some(d => d.type === type && d.contracted)
+
+const contractedByTypeCount = (type: DressCategory) =>
+  dressStore.dresses.filter(d => d.type === type && d.contracted).length
+
+const totalContractedPrice = computed(() =>
+  dressStore.dresses.filter(d => d.contracted).reduce((s, d) => s + d.contractPrice, 0)
+)
+
+const contractedCount = computed(() => dressStore.dresses.filter(d => d.contracted).length)
+const alternativeCount = computed(() => dressStore.dresses.filter(d => !d.contracted).length)
+
+const compareItems = computed(() => {
+  return compareIds.value
+    .map(id => dressStore.getDressById(id))
+    .filter(Boolean)
+    .map(d => ({
+      id: d!.id,
+      title: d!.name,
+      subtitle: `${d!.brand} · ${d!.type}`,
+      price: d!.price,
+      rating: d!.rating,
+      pros: d!.pros,
+      cons: d!.cons,
+      image: d!.image,
+      contracted: d!.contracted,
+      extraFields: [
+        { label: '类别', value: d!.type },
+        { label: '品牌', value: d!.brand },
+        { label: '风格', value: d!.style },
+        { label: '尺码', value: d!.size },
+        { label: '颜色', value: d!.color }
+      ]
+    }))
+})
+
+const budgetItem = computed(() => budgetStore.getItemByCategory('婚纱'))
+
+const openAddModal = () => {
+  editItem.value = null
+  showFormModal.value = true
 }
 
-const openContractModal = (dressId: string, currentPrice: number) => {
-  selectedDressId.value = dressId
-  contractPrice.value = currentPrice
-  showContractModal.value = true
-}
-
-const closeContractModal = () => {
-  showContractModal.value = false
-  selectedDressId.value = null
-  contractPrice.value = 0
-}
-
-const confirmContract = () => {
-  if (selectedDressId.value && contractPrice.value > 0) {
-    const dress = dressStore.getDressById(selectedDressId.value)
-    dressStore.updateContractDress(selectedDressId.value, contractPrice.value)
-    closeContractModal()
-    showToast(
-      '婚纱签约成功！',
-      `${dress?.name ?? dress?.style ?? ''} 已签约 ${formatPrice(contractPrice.value)}`,
-      'success',
-      2000
-    )
-    setTimeout(() => {
-      router.push('/budget')
-    }, 1500)
+const openEditModal = (id: string) => {
+  const item = dressStore.getDressById(id)
+  if (item) {
+    editItem.value = { ...item }
+    showFormModal.value = true
   }
 }
 
-const cancelContract = (dressId: string) => {
-  dressStore.cancelContractDress(dressId)
-  showToast('已取消签约', '', 'info')
+const handleFormSubmit = (data: any) => {
+  if (editItem.value) {
+    dressStore.updateDress(editItem.value.id, data)
+    showToast('修改成功', '礼服信息已更新', 'success')
+  } else {
+    dressStore.addDress(data)
+    showToast('添加成功', '已添加到婚纱方案库', 'success')
+  }
+  showFormModal.value = false
+  editItem.value = null
 }
+
+const handleDelete = (id: string) => {
+  if (confirm('确定要删除此礼服方案吗？')) {
+    const item = dressStore.getDressById(id)
+    dressStore.deleteDress(id)
+    compareIds.value = compareIds.value.filter(i => i !== id)
+    showToast('已删除', item?.name ?? '', 'info')
+  }
+}
+
+const openConfirmModal = (id: string) => {
+  const item = dressStore.getDressById(id)
+  if (item) {
+    selectedForConfirm.value = item
+    showConfirmModal.value = true
+  }
+}
+
+const handleConfirmSelection = (_id: string, price: number) => {
+  if (!selectedForConfirm.value) return
+  const id = selectedForConfirm.value.id
+  const dressName = selectedForConfirm.value.name
+  dressStore.updateContractDress(id, price)
+  showConfirmModal.value = false
+  showCompareModal.value = false
+  compareIds.value = []
+  selectedForConfirm.value = null
+  showToast('选型确认成功！', `${dressName} ${formatPrice(price)} 已写入预算`, 'success', 2500)
+  setTimeout(() => {
+    router.push('/budget')
+  }, 1800)
+}
+
+const handleCancelContract = (id: string) => {
+  dressStore.cancelContractDress(id)
+  showToast('已取消签约', '预算已同步更新', 'info')
+}
+
+const toggleCompare = (id: string) => {
+  const idx = compareIds.value.indexOf(id)
+  if (idx >= 0) {
+    compareIds.value.splice(idx, 1)
+  } else {
+    if (compareIds.value.length >= 4) {
+      showToast('最多对比4个方案', '请先移除部分方案', 'warning')
+      return
+    }
+    compareIds.value.push(id)
+  }
+}
+
+const removeFromCompare = (id: string) => {
+  compareIds.value = compareIds.value.filter(i => i !== id)
+}
+
+const selectFromCompare = (id: string) => {
+  openConfirmModal(id)
+}
+
+const toggleSortDesc = () => {
+  sortDesc.value = !sortDesc.value
+}
+
+const typeTabStyle = (type: DressCategory | 'all') =>
+  activeTypeTab.value === type
+    ? 'bg-primary-500 text-white shadow-md'
+    : 'bg-white text-gray-600 hover:bg-primary-50'
 </script>
 
 <template>
   <div class="min-h-screen bg-gradient-to-br from-primary-50 via-ivory to-champagne-100 pb-20">
     <div class="animate-fade-in">
-      <div class="bg-gradient-to-r from-primary-400 to-primary-500 px-6 pt-12 pb-16 rounded-b-3xl shadow-lg">
-        <h1 class="text-3xl font-serif font-bold text-white text-center">婚纱礼服</h1>
-        <p class="text-primary-100 text-center mt-2">最美时刻，盛装出席</p>
+      <div class="bg-gradient-to-r from-primary-400 to-primary-500 px-6 pt-12 pb-20 rounded-b-3xl shadow-lg relative overflow-hidden">
+        <div class="absolute inset-0 opacity-10">
+          <div class="absolute -top-20 -right-20 w-64 h-64 rounded-full bg-white"></div>
+          <div class="absolute -bottom-10 -left-10 w-48 h-48 rounded-full bg-white"></div>
+        </div>
+        <div class="relative z-10">
+          <h1 class="text-3xl font-serif font-bold text-white text-center">婚纱礼服</h1>
+          <p class="text-primary-100 text-center mt-2">最美一刻，为你而选</p>
+
+          <div class="grid grid-cols-4 gap-2 mt-6">
+            <div class="bg-white/15 backdrop-blur-sm rounded-2xl p-2.5 text-center">
+              <p class="text-xl font-bold text-white">{{ dressStore.dresses.length }}</p>
+              <p class="text-[10px] text-primary-100 mt-0.5">总方案</p>
+            </div>
+            <div
+              v-for="t in typeGroups"
+              :key="t"
+              class="bg-white/15 backdrop-blur-sm rounded-2xl p-2.5 text-center"
+            >
+              <p class="text-xl font-bold text-white">{{ contractedByTypeCount(t) }}/{{ dressStore.dresses.filter(d => d.type === t).length }}</p>
+              <p class="text-[10px] text-primary-100 mt-0.5">{{ t }}</p>
+            </div>
+          </div>
+
+          <div v-if="totalContractedPrice > 0" class="mt-4 bg-white/20 backdrop-blur-sm rounded-2xl p-3 text-center">
+            <p class="text-sm text-primary-50">已确认合同金额</p>
+            <p class="text-xl font-bold text-white mt-0.5">{{ formatPrice(totalContractedPrice) }}</p>
+          </div>
+        </div>
       </div>
 
-      <div class="px-4 -mt-10">
-        <div class="animate-slide-up mb-4 flex gap-2" style="animation-delay: 0.1s">
-          <button 
-            v-for="cat in categories" 
-            :key="cat.key"
-            @click="activeCategory = cat.key"
-            class="flex-1 py-2.5 rounded-xl text-sm font-medium transition-all duration-300"
-            :class="activeCategory === cat.key 
-              ? 'bg-white text-primary-500 shadow-md' 
-              : 'bg-white/50 text-gray-600 hover:bg-white'"
-          >
-            {{ cat.label }}
-          </button>
-        </div>
+      <div class="px-4 -mt-12 relative z-20">
+        <div class="bg-white rounded-2xl shadow-lg p-4 mb-5 animate-slide-up" style="animation-delay: 0.1s">
+          <div class="flex items-center gap-3 mb-3">
+            <button
+              @click="openAddModal"
+              class="flex-1 py-3 bg-gradient-to-r from-primary-400 to-primary-500 text-white rounded-xl font-medium flex items-center justify-center gap-2 hover:shadow-md transition-all duration-300"
+            >
+              <Plus class="w-5 h-5" />
+              添加礼服方案
+            </button>
+            <button
+              @click="showCompareModal = true"
+              :disabled="compareIds.length < 2"
+              class="py-3 px-4 bg-champagne-100 text-champagne-400 rounded-xl font-medium flex items-center gap-2 hover:bg-champagne-200 transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed"
+              :class="{ 'bg-primary-500 text-white hover:bg-primary-600': compareIds.length >= 2 }"
+            >
+              <ArrowLeftRight class="w-5 h-5" />
+              <span class="text-sm">{{ compareIds.length >= 2 ? `对比(${compareIds.length})` : '对比' }}</span>
+            </button>
+            <button
+              @click="showFilter = !showFilter"
+              class="py-3 px-4 bg-gray-100 text-gray-600 rounded-xl font-medium flex items-center gap-2 hover:bg-gray-200 transition-all duration-300"
+              :class="{ 'bg-primary-100 text-primary-500': showFilter }"
+            >
+              <SlidersHorizontal class="w-5 h-5" />
+            </button>
+          </div>
 
-        <div class="space-y-4 mb-6">
-          <div 
-            v-for="(dress, index) in filteredDresses" 
-            :key="dress.id"
-            class="animate-slide-up bg-white rounded-2xl overflow-hidden shadow-md"
-            :style="{ animationDelay: `${0.2 + index * 0.15}s` }"
-          >
-            <img 
-              :src="dress.image" 
-              :alt="dress.style"
-              class="w-full h-64 object-cover"
-            />
-            <div class="p-4">
-              <div class="flex items-center justify-between mb-2">
-                <h3 class="text-lg font-bold text-gray-800">{{ dress.style }}</h3>
-                <span class="text-lg font-bold text-primary-500">{{ formatPrice(dress.price) }}</span>
-              </div>
-              
-              <div class="flex items-center gap-4 text-sm text-gray-500 mb-3">
-                <div class="flex items-center gap-1">
-                  <Tag class="w-4 h-4 text-champagne-300" />
-                  <span>{{ dress.type }}</span>
-                </div>
-                <div class="flex items-center gap-1">
-                  <Ruler class="w-4 h-4 text-primary-400" />
-                  <span>{{ dress.size }}</span>
-                </div>
-                <div class="flex items-center gap-1">
-                  <Clock class="w-4 h-4 text-morandi-purple" />
-                  <span>{{ dress.fittingDate }}</span>
-                </div>
-              </div>
+          <div class="flex gap-2 mb-3">
+            <button
+              @click="activeTypeTab = 'all'"
+              class="flex-1 py-2 rounded-xl text-sm font-medium transition-all duration-300"
+              :class="typeTabStyle('all')"
+            >
+              全部
+            </button>
+            <button
+              v-for="t in typeGroups"
+              :key="t"
+              @click="activeTypeTab = t"
+              class="flex-1 py-2 rounded-xl text-sm font-medium transition-all duration-300"
+              :class="typeTabStyle(t)"
+            >
+              {{ t }}
+            </button>
+          </div>
 
-              <div v-if="dress.contracted" class="flex items-center justify-between gap-2 p-3 bg-green-50 rounded-xl">
-                <div class="flex items-center gap-2">
-                  <CheckCircle class="w-5 h-5 text-green-500" />
-                  <div>
-                    <span class="text-sm text-green-600 font-medium">已签约</span>
-                    <p class="text-xs text-green-500">签约金额: {{ formatPrice(dress.contractPrice) }}</p>
-                  </div>
-                </div>
-                <button 
-                  @click="cancelContract(dress.id)"
-                  class="px-3 py-1.5 text-xs bg-white text-red-500 rounded-lg border border-red-200 hover:bg-red-50 transition-colors"
+          <div v-if="showFilter" class="space-y-3 pt-3 border-t border-gray-100 animate-fade-in">
+            <div class="flex items-center gap-3">
+              <Filter class="w-4 h-4 text-gray-500 flex-shrink-0" />
+              <span class="text-sm text-gray-600 font-medium">状态:</span>
+              <div class="flex gap-2 flex-wrap">
+                <button
+                  v-for="s in ([
+                    { key: 'all', label: '全部' },
+                    { key: 'contracted', label: '已确认' },
+                    { key: 'alternative', label: '备选' }
+                  ] as const)"
+                  :key="s.key"
+                  @click="filterStatus = s.key"
+                  class="px-3 py-1.5 text-xs rounded-lg transition-colors"
+                  :class="filterStatus === s.key
+                    ? 'bg-primary-500 text-white'
+                    : 'bg-gray-100 text-gray-600 hover:bg-gray-200'"
                 >
-                  取消签约
+                  {{ s.label }}
                 </button>
               </div>
-
-              <button 
-                v-else
-                @click="openContractModal(dress.id, dress.price)"
-                class="w-full py-3 bg-gradient-to-r from-primary-400 to-primary-500 text-white rounded-xl font-medium flex items-center justify-center gap-2 hover:shadow-lg transition-all duration-300"
-              >
-                <FileSignature class="w-5 h-5" />
-                立即签约
-              </button>
+            </div>
+            <div class="flex items-center gap-3">
+              <ArrowUpDown class="w-4 h-4 text-gray-500 flex-shrink-0" />
+              <span class="text-sm text-gray-600 font-medium">排序:</span>
+              <div class="flex gap-2 flex-wrap items-center">
+                <button
+                  v-for="s in ([
+                    { key: 'createdAt', label: '添加时间' },
+                    { key: 'price', label: '价格' },
+                    { key: 'rating', label: '评分' }
+                  ] as const)"
+                  :key="s.key"
+                  @click="sortKey = s.key"
+                  class="px-3 py-1.5 text-xs rounded-lg transition-colors"
+                  :class="sortKey === s.key
+                    ? 'bg-primary-500 text-white'
+                    : 'bg-gray-100 text-gray-600 hover:bg-gray-200'"
+                >
+                  {{ s.label }}
+                </button>
+                <button
+                  @click="toggleSortDesc"
+                  class="px-2 py-1.5 text-xs bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors text-gray-600"
+                >
+                  {{ sortDesc ? '↓ 降序' : '↑ 升序' }}
+                </button>
+              </div>
             </div>
           </div>
         </div>
 
-        <div class="animate-slide-up bg-white rounded-2xl p-5 shadow-md mb-6" style="animation-delay: 0.5s">
+        <div v-if="sortedItems.length === 0" class="bg-white rounded-2xl p-10 text-center shadow-md animate-fade-in">
+          <div class="w-20 h-20 rounded-full bg-gray-100 flex items-center justify-center mx-auto mb-4">
+            <Shirt class="w-10 h-10 text-gray-400" />
+          </div>
+          <h3 class="text-lg font-bold text-gray-700 mb-2">暂无礼服方案</h3>
+          <p class="text-sm text-gray-500 mb-5">点击上方"添加礼服方案"开始建立你的备选库</p>
+          <button
+            @click="openAddModal"
+            class="py-3 px-6 bg-gradient-to-r from-primary-400 to-primary-500 text-white rounded-xl font-medium inline-flex items-center gap-2 hover:shadow-md transition-all duration-300"
+          >
+            <Plus class="w-5 h-5" />
+            立即添加
+          </button>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div
+            v-for="(dress, index) in sortedItems"
+            :key="dress.id"
+            class="animate-slide-up"
+            :style="{ animationDelay: `${0.15 + index * 0.08}s` }"
+          >
+            <OptionCard
+              :option="dress"
+              :title="dress.name"
+              :subtitle="`${dress.brand} · ${dress.type}`"
+              :image="dress.image"
+              :tags="[dress.type, dress.style, dress.color]"
+              :meta-items="[
+                { icon: DressPalette, label: '品牌', value: dress.brand },
+                { icon: Ruler, label: '尺码', value: dress.size },
+                { icon: Shirt, label: '颜色', value: dress.color },
+                { icon: Calendar, label: '试纱', value: dress.fittingDate || '待定' }
+              ]"
+              :selected-for-compare="compareIds.includes(dress.id)"
+              :disabled="!dress.contracted && hasContractedByType(dress.type)"
+              @sign="openConfirmModal"
+              @cancel="handleCancelContract"
+              @edit="openEditModal"
+              @delete="handleDelete"
+              @toggle-compare="toggleCompare"
+            />
+          </div>
+        </div>
+
+        <div v-if="dressStore.sizeChart.length" class="animate-slide-up bg-white rounded-2xl p-5 shadow-md mt-6 mb-5" style="animation-delay: 0.5s">
           <h2 class="text-lg font-bold text-gray-800 mb-4 flex items-center gap-2">
             <Ruler class="w-5 h-5 text-primary-400" />
-            尺寸参数表
+            尺码对照表
           </h2>
           <div class="overflow-x-auto">
             <table class="w-full text-sm">
               <thead>
                 <tr class="border-b border-gray-100">
-                  <th class="py-2 px-3 text-left text-gray-500 font-medium">尺码</th>
-                  <th class="py-2 px-3 text-center text-gray-500 font-medium">胸围</th>
-                  <th class="py-2 px-3 text-center text-gray-500 font-medium">腰围</th>
-                  <th class="py-2 px-3 text-center text-gray-500 font-medium">臀围</th>
+                  <th class="py-3 px-2 text-left text-gray-500 font-medium">尺码</th>
+                  <th class="py-3 px-2 text-center text-gray-500 font-medium">胸围</th>
+                  <th class="py-3 px-2 text-center text-gray-500 font-medium">腰围</th>
+                  <th class="py-3 px-2 text-center text-gray-500 font-medium">臀围</th>
                 </tr>
               </thead>
               <tbody>
-                <tr 
-                  v-for="row in dressStore.sizeChart" 
-                  :key="row.size"
-                  class="border-b border-gray-50 last:border-0"
-                  :class="row.size === 'S' ? 'bg-primary-50/50' : ''"
-                >
-                  <td class="py-3 px-3">
-                    <span 
-                      class="px-2 py-0.5 rounded text-xs font-medium"
-                      :class="row.size === 'S' ? 'bg-primary-500 text-white' : 'text-gray-700'"
-                    >
-                      {{ row.size }}
-                    </span>
-                  </td>
-                  <td class="py-3 px-3 text-center text-gray-600">{{ row.bust }}cm</td>
-                  <td class="py-3 px-3 text-center text-gray-600">{{ row.waist }}cm</td>
-                  <td class="py-3 px-3 text-center text-gray-600">{{ row.hip }}cm</td>
+                <tr v-for="row in dressStore.sizeChart" :key="row.size" class="border-b border-gray-50">
+                  <td class="py-3 px-2 font-medium text-primary-500">{{ row.size }}</td>
+                  <td class="py-3 px-2 text-center text-gray-700">{{ row.bust }} cm</td>
+                  <td class="py-3 px-2 text-center text-gray-700">{{ row.waist }} cm</td>
+                  <td class="py-3 px-2 text-center text-gray-700">{{ row.hip }} cm</td>
                 </tr>
               </tbody>
             </table>
           </div>
         </div>
 
-        <div class="animate-slide-up" style="animation-delay: 0.6s">
-          <h2 class="text-lg font-bold text-gray-800 mb-4 flex items-center gap-2">
-            <Clock class="w-5 h-5 text-primary-400" />
-            试穿记录
-          </h2>
-          <div class="relative">
-            <div class="absolute left-5 top-0 bottom-0 w-0.5 bg-primary-200"></div>
-            <div class="space-y-4">
-              <div 
-                v-for="(record, index) in dressStore.fittingRecords" 
-                :key="record.id"
-                class="relative pl-12"
-                :style="{ animationDelay: `${0.7 + index * 0.1}s` }"
-              >
-                <div class="absolute left-3 top-1 w-4 h-4 rounded-full bg-primary-500 border-4 border-primary-100"></div>
-                <div class="bg-white rounded-xl p-4 shadow-sm">
-                  <div class="flex items-center justify-between mb-2">
-                    <span class="text-sm font-medium text-primary-500">{{ record.date }} {{ record.time }}</span>
-                    <ChevronRight class="w-4 h-4 text-gray-400" />
-                  </div>
-                  <p class="font-medium text-gray-800">{{ record.dressName }}</p>
-                  <p class="text-sm text-gray-500 mt-1">{{ record.notes }}</p>
-                </div>
+        <div v-if="dressStore.fittingRecords.length" class="animate-slide-up" style="animation-delay: 0.6s">
+          <h2 class="text-lg font-bold text-gray-800 mb-4">试纱记录</h2>
+          <div class="space-y-3">
+            <div
+              v-for="record in dressStore.fittingRecords"
+              :key="record.id"
+              class="bg-white rounded-2xl p-4 shadow-md"
+            >
+              <div class="flex items-center justify-between mb-2">
+                <p class="font-bold text-gray-800">{{ record.dressName }}</p>
+                <p class="text-sm text-primary-400">{{ record.date }} {{ record.time }}</p>
               </div>
+              <p class="text-sm text-gray-600 bg-gray-50 p-3 rounded-xl">{{ record.notes }}</p>
             </div>
           </div>
         </div>
       </div>
 
-      <Teleport to="body">
-        <div v-if="showContractModal" class="fixed inset-0 z-50 flex items-center justify-center p-4">
-          <div class="absolute inset-0 bg-black/50 backdrop-blur-sm" @click="closeContractModal"></div>
-          <div class="relative bg-white rounded-3xl p-6 w-full max-w-md animate-fade-in shadow-2xl">
-            <button 
-              @click="closeContractModal"
-              class="absolute top-4 right-4 w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center hover:bg-gray-200 transition-colors"
-            >
-              <X class="w-5 h-5 text-gray-500" />
-            </button>
-            
-            <div class="text-center mb-6">
-              <div class="w-16 h-16 rounded-full bg-primary-100 flex items-center justify-center mx-auto mb-4">
-                <FileSignature class="w-8 h-8 text-primary-500" />
-              </div>
-              <h3 class="text-xl font-bold text-gray-800">婚纱签约</h3>
-              <p class="text-sm text-gray-500 mt-1">请确认签约金额</p>
-            </div>
+      <OptionFormModal
+        :visible="showFormModal"
+        :title="editItem ? '编辑礼服方案' : '添加礼服方案'"
+        category="dress"
+        :edit-data="editItem"
+        @close="showFormModal = false; editItem = null"
+        @submit="handleFormSubmit"
+      />
 
-            <div class="space-y-4">
-              <div>
-                <label class="block text-sm font-medium text-gray-700 mb-2">签约金额</label>
-                <div class="relative">
-                  <span class="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500 font-medium">¥</span>
-                  <input 
-                    v-model.number="contractPrice"
-                    type="number"
-                    class="w-full pl-10 pr-4 py-3 border-2 border-gray-200 rounded-xl focus:border-primary-400 focus:outline-none transition-colors text-lg font-medium"
-                    placeholder="请输入签约金额"
-                  />
-                </div>
-              </div>
+      <CompareModal
+        :visible="showCompareModal"
+        :items="compareItems"
+        category="婚纱"
+        @close="showCompareModal = false"
+        @remove="removeFromCompare"
+        @select="selectFromCompare"
+      />
 
-              <div class="flex gap-3 pt-4">
-                <button 
-                  @click="closeContractModal"
-                  class="flex-1 py-3 border-2 border-gray-200 text-gray-600 rounded-xl font-medium hover:bg-gray-50 transition-colors"
-                >
-                  取消
-                </button>
-                <button 
-                  @click="confirmContract"
-                  :disabled="contractPrice <= 0"
-                  class="flex-1 py-3 bg-gradient-to-r from-primary-400 to-primary-500 text-white rounded-xl font-medium hover:shadow-lg transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  确认签约
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      </Teleport>
+      <ConfirmSelectionModal
+        :visible="showConfirmModal"
+        :option="selectedForConfirm ? {
+          id: selectedForConfirm.id,
+          title: selectedForConfirm.name,
+          subtitle: `${selectedForConfirm.brand} · ${selectedForConfirm.type}`,
+          price: selectedForConfirm.price,
+          image: selectedForConfirm.image
+        } : null"
+        category="婚纱"
+        budget-category="婚纱"
+        :current-budget="budgetItem ? {
+          planned: budgetItem.planned,
+          actual: budgetItem.actual,
+          locked: budgetItem.locked
+        } : undefined"
+        @close="showConfirmModal = false; selectedForConfirm = null"
+        @confirm="handleConfirmSelection"
+      />
 
-      <Toast 
-        :visible="toastVisible" 
-        :message="toastMessage" 
+      <Toast
+        :visible="toastVisible"
+        :message="toastMessage"
         :description="toastDescription"
-        :type="toastType" 
+        :type="toastType"
       />
     </div>
   </div>
