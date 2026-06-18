@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref, watch, computed } from 'vue'
-import { X, FileSignature, CheckCircle, Wallet, AlertTriangle, ArrowRight } from 'lucide-vue-next'
+import { X, FileSignature, CheckCircle, Wallet, AlertTriangle, ArrowRight, ArrowLeftRight, TrendingUp, TrendingDown, Minus } from 'lucide-vue-next'
 
 const props = defineProps<{
   visible: boolean
@@ -19,6 +19,15 @@ const props = defineProps<{
     actual: number
     locked?: boolean
   }
+  previousOption?: {
+    id: string
+    title: string
+    subtitle?: string
+    price: number
+    contractPrice: number
+    image?: string
+    [key: string]: any
+  } | null
 }>()
 
 const emit = defineEmits<{
@@ -36,14 +45,37 @@ watch(() => props.visible, (val) => {
 
 const formatPrice = (price: number) => `¥${price.toLocaleString()}`
 
+const isChanging = computed(() => !!props.previousOption)
+
+const priceDiff = computed(() => {
+  if (!props.previousOption) return null
+  return contractPrice.value - props.previousOption.contractPrice
+})
+
 const budgetDiff = computed(() => {
   if (!props.currentBudget) return null
+  if (isChanging.value && props.previousOption) {
+    return contractPrice.value - props.previousOption.contractPrice
+  }
   return contractPrice.value - props.currentBudget.actual
+})
+
+const newBudgetActual = computed(() => {
+  if (!props.currentBudget) return contractPrice.value
+  if (isChanging.value && props.previousOption) {
+    return props.currentBudget.actual - props.previousOption.contractPrice + contractPrice.value
+  }
+  return props.currentBudget.actual + contractPrice.value
 })
 
 const overBudget = computed(() => {
   if (!props.currentBudget) return false
-  return contractPrice.value > props.currentBudget.planned
+  return newBudgetActual.value > props.currentBudget.planned
+})
+
+const budgetRemaining = computed(() => {
+  if (!props.currentBudget) return 0
+  return props.currentBudget.planned - newBudgetActual.value
 })
 
 const canConfirm = computed(() => {
@@ -60,7 +92,7 @@ const handleConfirm = () => {
   <Teleport to="body">
     <div v-if="visible && option" class="fixed inset-0 z-50 flex items-center justify-center p-4">
       <div class="absolute inset-0 bg-black/50 backdrop-blur-sm" @click="emit('close')"></div>
-      <div class="relative bg-white rounded-3xl p-6 w-full max-w-md animate-fade-in shadow-2xl">
+      <div class="relative bg-white rounded-3xl p-6 w-full max-w-md animate-fade-in shadow-2xl max-h-[90vh] overflow-y-auto">
         <button
           @click="emit('close')"
           class="absolute top-4 right-4 w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center hover:bg-gray-200 transition-colors"
@@ -70,13 +102,46 @@ const handleConfirm = () => {
 
         <div class="text-center mb-6">
           <div class="w-16 h-16 rounded-full bg-gradient-to-br from-primary-100 to-champagne-100 flex items-center justify-center mx-auto mb-4">
-            <FileSignature class="w-8 h-8 text-primary-500" />
+            <component :is="isChanging ? ArrowLeftRight : FileSignature" class="w-8 h-8 text-primary-500" />
           </div>
-          <h3 class="text-xl font-bold text-gray-800">选型确认</h3>
-          <p class="text-sm text-gray-500 mt-1">确认后将一键写入预算</p>
+          <h3 class="text-xl font-bold text-gray-800">{{ isChanging ? '套系变更确认' : '选型确认' }}</h3>
+          <p class="text-sm text-gray-500 mt-1">{{ isChanging ? '确认变更后将自动更新预算' : '确认后将一键写入预算' }}</p>
         </div>
 
-        <div class="flex items-center gap-4 p-4 bg-gray-50 rounded-2xl mb-5">
+        <div v-if="isChanging && previousOption" class="mb-5">
+          <div class="relative">
+            <div class="flex items-center gap-3 p-3 bg-gray-50 rounded-2xl border-2 border-gray-200 opacity-80">
+              <div
+                v-if="previousOption.image"
+                class="w-14 h-14 rounded-xl overflow-hidden flex-shrink-0 shadow-md"
+              >
+                <img :src="previousOption.image" :alt="previousOption.title" class="w-full h-full object-cover" />
+              </div>
+              <div v-else class="w-14 h-14 rounded-xl bg-gradient-to-br from-gray-200 to-gray-300 flex-shrink-0 shadow-md flex items-center justify-center">
+                <span class="text-lg font-bold text-gray-500">{{ previousOption.title.charAt(0) }}</span>
+              </div>
+              <div class="flex-1 min-w-0">
+                <div class="flex items-center gap-1.5">
+                  <span class="px-2 py-0.5 text-[10px] rounded-full bg-gray-200 text-gray-600 font-medium">原套系</span>
+                </div>
+                <h4 class="font-medium text-gray-700 truncate text-sm mt-1">{{ previousOption.title }}</h4>
+                <p v-if="previousOption.subtitle" class="text-[11px] text-gray-500 mt-0.5 truncate">{{ previousOption.subtitle }}</p>
+              </div>
+              <div class="text-right">
+                <p class="text-xs text-gray-500 line-through">{{ formatPrice(previousOption.price) }}</p>
+                <p class="text-sm font-bold text-gray-600">{{ formatPrice(previousOption.contractPrice) }}</p>
+              </div>
+            </div>
+
+            <div class="flex justify-center my-2">
+              <div class="w-8 h-8 rounded-full bg-primary-500 text-white flex items-center justify-center shadow-md z-10">
+                <ArrowRight class="w-4 h-4" />
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="flex items-center gap-3 p-4 bg-primary-50 rounded-2xl mb-5 border-2 border-primary-200">
           <div
             v-if="option.image"
             class="w-16 h-16 rounded-xl overflow-hidden flex-shrink-0 shadow-md"
@@ -87,10 +152,52 @@ const handleConfirm = () => {
             <span class="text-xl font-bold text-primary-500">{{ option.title.charAt(0) }}</span>
           </div>
           <div class="flex-1 min-w-0">
-            <h4 class="font-bold text-gray-800 truncate">{{ option.title }}</h4>
+            <div class="flex items-center gap-1.5">
+              <span class="px-2 py-0.5 text-[10px] rounded-full" :class="isChanging ? 'bg-primary-500 text-white' : 'bg-primary-100 text-primary-600'" font-medium>
+                {{ isChanging ? '新套系' : '选套系' }}
+              </span>
+            </div>
+            <h4 class="font-bold text-gray-800 truncate mt-1">{{ option.title }}</h4>
             <p v-if="option.subtitle" class="text-xs text-gray-500 mt-0.5 truncate">{{ option.subtitle }}</p>
             <p class="text-sm text-primary-500 font-medium mt-1">{{ category }}</p>
           </div>
+        </div>
+
+        <div v-if="isChanging && priceDiff !== null" class="mb-5 p-4 rounded-2xl border-2"
+          :class="priceDiff > 0 ? 'bg-red-50 border-red-200' : priceDiff < 0 ? 'bg-green-50 border-green-200' : 'bg-gray-50 border-gray-200'"
+        >
+          <div class="flex items-center justify-between">
+            <div class="flex items-center gap-2">
+              <component
+                :is="priceDiff > 0 ? TrendingUp : priceDiff < 0 ? TrendingDown : Minus"
+                class="w-5 h-5"
+                :class="priceDiff > 0 ? 'text-red-500' : priceDiff < 0 ? 'text-green-500' : 'text-gray-500'"
+              />
+              <span class="text-sm font-medium"
+                :class="priceDiff > 0 ? 'text-red-700' : priceDiff < 0 ? 'text-green-700' : 'text-gray-700'"
+              >
+                套系差额
+              </span>
+            </div>
+            <span class="text-lg font-bold"
+              :class="priceDiff > 0 ? 'text-red-600' : priceDiff < 0 ? 'text-green-600' : 'text-gray-600'"
+            >
+              {{ priceDiff > 0 ? '+' : '' }}{{ formatPrice(priceDiff) }}
+            </span>
+          </div>
+          <p class="text-xs mt-2"
+            :class="priceDiff > 0 ? 'text-red-600' : priceDiff < 0 ? 'text-green-600' : 'text-gray-500'"
+          >
+            <template v-if="priceDiff > 0">
+              新套系比原套系贵 {{ formatPrice(priceDiff) }}，预算将相应增加
+            </template>
+            <template v-else-if="priceDiff < 0">
+              新套系比原套系省 {{ formatPrice(Math.abs(priceDiff)) }}，预算将相应减少
+            </template>
+            <template v-else>
+              新旧套系价格相同，预算无变化
+            </template>
+          </p>
         </div>
 
         <div class="space-y-4 mb-5">
@@ -128,10 +235,30 @@ const handleConfirm = () => {
               </div>
               <div class="flex justify-between pt-2 border-t" :class="overBudget ? 'border-red-200' : 'border-green-200'">
                 <span class="font-medium" :class="overBudget ? 'text-red-700' : 'text-green-700'">
-                  确认后{{ overBudget ? '超出' : '差额' }}
+                  {{ isChanging ? '变更后已用' : '确认后已用' }}
                 </span>
                 <span class="font-bold" :class="overBudget ? 'text-red-600' : 'text-green-600'">
-                  {{ overBudget ? '+' : '' }}{{ formatPrice(budgetDiff ?? 0) }}
+                  {{ formatPrice(newBudgetActual) }}
+                </span>
+              </div>
+              <div class="flex justify-between">
+                <span class="font-medium" :class="overBudget ? 'text-red-700' : 'text-green-700'">
+                  {{ overBudget ? '超出预算' : '剩余预算' }}
+                </span>
+                <span class="font-bold" :class="overBudget ? 'text-red-600' : 'text-green-600'">
+                  {{ overBudget ? '+' : '' }}{{ formatPrice(Math.abs(budgetRemaining)) }}
+                </span>
+              </div>
+              <div v-if="isChanging && budgetDiff !== null" class="flex justify-between pt-2 border-t"
+                :class="budgetDiff > 0 ? 'border-orange-200' : budgetDiff < 0 ? 'border-blue-200' : 'border-gray-200'"
+              >
+                <span class="font-medium text-xs text-gray-600">
+                  预算变动额
+                </span>
+                <span class="font-bold text-xs"
+                  :class="budgetDiff > 0 ? 'text-orange-600' : budgetDiff < 0 ? 'text-blue-600' : 'text-gray-500'"
+                >
+                  {{ budgetDiff > 0 ? '+' : '' }}{{ formatPrice(budgetDiff) }}
                 </span>
               </div>
             </div>
@@ -159,7 +286,7 @@ const handleConfirm = () => {
             class="flex-1 py-3 bg-gradient-to-r from-primary-400 to-primary-500 text-white rounded-xl font-medium flex items-center justify-center gap-2 hover:shadow-lg transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed"
           >
             <CheckCircle class="w-5 h-5" />
-            确认写入预算
+            {{ isChanging ? '确认变更套系' : '确认写入预算' }}
           </button>
         </div>
       </div>

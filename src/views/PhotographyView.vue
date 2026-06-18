@@ -47,6 +47,21 @@ const formatPrice = (price: number) => `¥${price.toLocaleString()}`
 
 const hasContractedItem = computed(() => photographyStore.items.some(p => p.contracted))
 
+const currentContractedItem = computed(() => photographyStore.items.find(p => p.contracted) ?? null)
+
+const previousForConfirm = computed(() => {
+  if (!selectedForConfirm.value) return null
+  if (!currentContractedItem.value) return null
+  if (currentContractedItem.value.id === selectedForConfirm.value.id) return null
+  return {
+    id: currentContractedItem.value.id,
+    title: currentContractedItem.value.teamName,
+    subtitle: currentContractedItem.value.packageType,
+    price: currentContractedItem.value.price,
+    contractPrice: currentContractedItem.value.contractPrice
+  }
+})
+
 const sortedItems = computed(() => {
   let list = [...photographyStore.items]
   if (filterStatus.value === 'contracted') {
@@ -145,12 +160,18 @@ const handleConfirmSelection = (_id: string, price: number) => {
   if (!selectedForConfirm.value) return
   const id = selectedForConfirm.value.id
   const teamName = selectedForConfirm.value.teamName
+  const isChange = !!previousForConfirm.value
+  const previousName = previousForConfirm.value?.title
   photographyStore.updateContractItem(id, price)
   showConfirmModal.value = false
   showCompareModal.value = false
   compareIds.value = []
   selectedForConfirm.value = null
-  showToast('选型确认成功！', `${teamName} ${formatPrice(price)} 已写入预算`, 'success', 2500)
+  if (isChange && previousName) {
+    showToast('套系变更成功！', `${previousName} → ${teamName} ${formatPrice(price)}，预算已更新`, 'success', 2800)
+  } else {
+    showToast('选型确认成功！', `${teamName} ${formatPrice(price)} 已写入预算`, 'success', 2500)
+  }
   setTimeout(() => {
     router.push('/budget')
   }, 1800)
@@ -339,7 +360,7 @@ const getAvatarColor = (name: string) => {
                 { icon: Calendar, label: '日期', value: item.shootDate || '待定' }
               ]"
               :selected-for-compare="compareIds.includes(item.id)"
-              :disabled="!item.contracted && hasContractedItem"
+              :is-changing="!item.contracted && hasContractedItem"
               @sign="openConfirmModal"
               @cancel="handleCancelContract"
               @edit="openEditModal"
@@ -465,6 +486,7 @@ const getAvatarColor = (name: string) => {
           actual: budgetItem.actual,
           locked: budgetItem.locked
         } : undefined"
+        :previous-option="previousForConfirm"
         @close="showConfirmModal = false; selectedForConfirm = null"
         @confirm="handleConfirmSelection"
       />

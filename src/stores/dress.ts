@@ -59,6 +59,16 @@ export const useDressStore = defineStore('dress', () => {
 
   function updateContractDress(id: string, contractPrice: number) {
     const budgetStore = useBudgetStore()
+    const targetDress = dresses.value.find(d => d.id === id)
+    if (targetDress) {
+      const targetType = targetDress.type
+      dresses.value.forEach((dress) => {
+        if (dress.type === targetType && dress.id !== id) {
+          dress.contracted = false
+          dress.contractPrice = 0
+        }
+      })
+    }
     const index = dresses.value.findIndex(dress => dress.id === id)
     if (index !== -1) {
       dresses.value[index].contracted = true

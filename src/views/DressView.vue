@@ -48,6 +48,24 @@ const formatPrice = (price: number) => `¥${price.toLocaleString()}`
 
 const typeGroups: DressCategory[] = ['主纱', '出门纱', '敬酒服']
 
+const getContractedByType = (type: DressCategory) =>
+  dressStore.dresses.find(d => d.type === type && d.contracted) ?? null
+
+const previousForConfirm = computed(() => {
+  if (!selectedForConfirm.value) return null
+  const contracted = getContractedByType(selectedForConfirm.value.type)
+  if (!contracted) return null
+  if (contracted.id === selectedForConfirm.value.id) return null
+  return {
+    id: contracted.id,
+    title: contracted.name,
+    subtitle: `${contracted.brand} · ${contracted.type}`,
+    price: contracted.price,
+    contractPrice: contracted.contractPrice,
+    image: contracted.image
+  }
+})
+
 const sortedItems = computed(() => {
   let list = [...dressStore.dresses]
   if (activeTypeTab.value !== 'all') {
@@ -161,12 +179,18 @@ const handleConfirmSelection = (_id: string, price: number) => {
   if (!selectedForConfirm.value) return
   const id = selectedForConfirm.value.id
   const dressName = selectedForConfirm.value.name
+  const isChange = !!previousForConfirm.value
+  const previousName = previousForConfirm.value?.title
   dressStore.updateContractDress(id, price)
   showConfirmModal.value = false
   showCompareModal.value = false
   compareIds.value = []
   selectedForConfirm.value = null
-  showToast('选型确认成功！', `${dressName} ${formatPrice(price)} 已写入预算`, 'success', 2500)
+  if (isChange && previousName) {
+    showToast('套系变更成功！', `${previousName} → ${dressName} ${formatPrice(price)}，预算已更新`, 'success', 2800)
+  } else {
+    showToast('选型确认成功！', `${dressName} ${formatPrice(price)} 已写入预算`, 'success', 2500)
+  }
   setTimeout(() => {
     router.push('/budget')
   }, 1800)
@@ -376,7 +400,7 @@ const typeTabStyle = (type: DressCategory | 'all') =>
                 { icon: Calendar, label: '试纱', value: dress.fittingDate || '待定' }
               ]"
               :selected-for-compare="compareIds.includes(dress.id)"
-              :disabled="!dress.contracted && hasContractedByType(dress.type)"
+              :is-changing="!dress.contracted && hasContractedByType(dress.type)"
               @sign="openConfirmModal"
               @cancel="handleCancelContract"
               @edit="openEditModal"
@@ -465,6 +489,7 @@ const typeTabStyle = (type: DressCategory | 'all') =>
           actual: budgetItem.actual,
           locked: budgetItem.locked
         } : undefined"
+        :previous-option="previousForConfirm"
         @close="showConfirmModal = false; selectedForConfirm = null"
         @confirm="handleConfirmSelection"
       />

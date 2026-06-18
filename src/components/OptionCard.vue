@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed } from 'vue'
-import { Star, Plus, Minus, FileText, CheckCircle, XCircle, FileSignature, Trash2, Edit3, ArrowLeftRight } from 'lucide-vue-next'
+import { Star, Plus, Minus, FileText, CheckCircle, XCircle, FileSignature, Trash2, Edit3, ArrowLeftRight, RefreshCw } from 'lucide-vue-next'
 
 interface BaseOption {
   id: string
@@ -25,6 +25,7 @@ const props = defineProps<{
   showStatus?: boolean
   selectedForCompare?: boolean
   disabled?: boolean
+  isChanging?: boolean
 }>()
 
 const emit = defineEmits<{
@@ -53,6 +54,9 @@ const statusClass = computed(() => {
   }
   if (props.disabled) {
     return 'bg-gray-50 opacity-70'
+  }
+  if (props.isChanging) {
+    return 'bg-white hover:shadow-xl hover:-translate-y-1 border-champagne-200'
   }
   return 'bg-white hover:shadow-xl hover:-translate-y-1'
 })
@@ -201,10 +205,11 @@ const statusClass = computed(() => {
           <button
             @click="emit('sign', option.id, option.price)"
             :disabled="disabled"
-            class="flex-1 py-2.5 bg-gradient-to-r from-primary-400 to-primary-500 text-white rounded-xl font-medium flex items-center justify-center gap-1.5 hover:shadow-lg transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed text-sm"
+            class="flex-1 py-2.5 text-white rounded-xl font-medium flex items-center justify-center gap-1.5 hover:shadow-lg transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed text-sm"
+            :class="isChanging ? 'bg-gradient-to-r from-champagne-400 to-amber-500' : 'bg-gradient-to-r from-primary-400 to-primary-500'"
           >
-            <FileSignature class="w-4 h-4" />
-            选型确认
+            <component :is="isChanging ? RefreshCw : FileSignature" class="w-4 h-4" />
+            {{ isChanging ? '变更套系' : '选型确认' }}
           </button>
           <button
             @click="emit('toggleCompare', option.id)"
@@ -232,6 +237,10 @@ const statusClass = computed(() => {
         <div v-if="disabled" class="flex items-center gap-2 p-2 bg-gray-100 rounded-xl">
           <XCircle class="w-4 h-4 text-gray-400" />
           <span class="text-xs text-gray-500 font-medium">已选定其他方案，先取消后再选</span>
+        </div>
+        <div v-else-if="isChanging" class="flex items-center gap-2 p-2 bg-champagne-50 rounded-xl border border-champagne-200">
+          <RefreshCw class="w-4 h-4 text-champagne-500" />
+          <span class="text-xs text-champagne-600 font-medium">点击变更为新套系将自动替换当前方案</span>
         </div>
       </div>
     </div>
