@@ -341,7 +341,8 @@ export const useGuestsStore = defineStore('guests', () => {
     currentGuestWasAssigned: boolean,
     newTableNumber: number | null,
     status: GuestStatus,
-    guestId: string | null
+    guestId: string | null,
+    oldTableNumber: number | null
   ): { valid: boolean; message: string; finalTableNumber: number | null; newAssignedCount: number } {
     let tableNumber = newTableNumber
     if (status === 'declined') {
@@ -379,11 +380,12 @@ export const useGuestsStore = defineStore('guests', () => {
     }
 
     if (tableNumber !== null) {
+      const isChangingTable = oldTableNumber !== tableNumber
       const currentTablesCount = guests.value.filter(
         g => g.tableNumber === tableNumber && g.status !== 'declined' && g.id !== guestId
       ).length
-      const willAdd = !currentGuestWasAssigned ? 1 : 0
-      const newCount = currentTablesCount + willAdd
+      const willAddToTarget = isChangingTable ? 1 : 0
+      const newCount = currentTablesCount + willAddToTarget
       const perTableOverflow = Math.max(0, newCount - maxGuestsPerTable.value)
       if (perTableOverflow > 0) {
         return {
@@ -464,7 +466,8 @@ export const useGuestsStore = defineStore('guests', () => {
                     wasAssigned,
                     parsedTableNumber,
                     status,
-                    existingGuest.id
+                    existingGuest.id,
+                    existingGuest.tableNumber
                   )
 
                   let finalTableNumber: number | null
@@ -497,6 +500,7 @@ export const useGuestsStore = defineStore('guests', () => {
                 false,
                 parsedTableNumber,
                 status,
+                null,
                 null
               )
 

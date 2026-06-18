@@ -122,7 +122,11 @@ const filteredTableStats = computed(() => {
         return matchesSearch && matchesStatus && matchesGroup
       })
     }))
-    .filter(table => table.displayGuests.length > 0)
+    .filter(table => {
+      const validation = guestsStore.perTableValidationMap.get(table.tableNumber)
+      const isOverLimit = validation && !validation.valid
+      return table.displayGuests.length > 0 || isOverLimit
+    })
 })
 
 const unassignedFilteredGuests = computed(() => {
@@ -639,6 +643,9 @@ const executeImport = async () => {
                 >
                   <Edit3 class="w-3.5 h-3.5" />
                 </button>
+              </div>
+              <div v-if="table.displayGuests.length === 0" class="py-4 text-center text-xs text-gray-400">
+                当前筛选条件下无匹配宾客
               </div>
             </div>
           </div>
