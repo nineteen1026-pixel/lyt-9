@@ -1,10 +1,23 @@
 import { defineStore } from 'pinia'
 import { ref, watch, computed } from 'vue'
+import * as XLSX from 'xlsx'
 import { get, set } from '../utils/storage'
 import { mockGuests, type Guest, type GuestStatus, type GuestGroup } from '../data/mockData'
 import { useVenuesStore } from './venues'
 
 export { type Guest, type GuestStatus, type GuestGroup }
+
+export interface TableInfo {
+  tableNumber: number
+  guests: Guest[]
+  count: number
+}
+
+export interface ImportResult {
+  success: number
+  failed: number
+  errors: string[]
+}
 
 export interface TableValidationResult {
   valid: boolean
@@ -35,7 +48,16 @@ export const useGuestsStore = defineStore('guests', () => {
   function updateGuest(id: string, updates: Partial<Omit<Guest, 'id'>>) {
     const index = guests.value.findIndex(guest => guest.id === id)
     if (index !== -1) {
-      guests.value[index] = { ...guests.value[index], ...updates }
+      const finalUpdates = { ...updates }
+      if (finalUpdates.status === 'declined') {
+        finalUpdates.tableNumber = null
+        finalUpdates.attendance = '未出席'
+      } else if (finalUpdates.status === 'confirmed') {
+        finalUpdates.attendance = '已确认'
+      } else if (finalUpdates.status === 'pending') {
+        finalUpdates.attendance = '待确认'
+      }
+      guests.value[index] = { ...guests.value[index], ...finalUpdates }
     }
   }
 
@@ -167,6 +189,190 @@ export const useGuestsStore = defineStore('guests', () => {
     return null
   })
 
+  const tableStats = computed<TableInfo[]>(() => {
+    const tableMap = new Map<number, Guest[]>()
+    guests.value
+      .filter(g => g.tableNumber !== null && g.status !== 'declined')
+      .forEach(g => {
+        const tableNum = g.tableNumber!
+        if (!tableMap.has(tableNum)) {
+          tableMap.set(tableNum, [])
+        }
+        tableMap.get(tableNum)!.push(g)
+      })
+    return Array.from(tableMap.entries())
+      .map(([tableNumber, tableGuests]) => ({
+        tableNumber,
+        guests: tableGuests.sort((a, b) => a.name.localeCompare(b.name, 'zh-CN')),
+        count: tableGuests.length
+      }))
+      .sort((a, b) => a.tableNumber - b.tableNumber)
+  })
+
+  const tableCount = computed(() => tableStats.value.length)
+
+  function parseStatus(statusStr: string): GuestStatus {
+    const map: Record<string, GuestStatus> = {
+      '已确认': 'confirmed',
+      'confirmed': 'confirmed',
+      '待确认': 'pending',
+      '待定': 'pending',
+      'pending': 'pending',
+      '未出席': 'declined',
+      '缺席': 'declined',
+      'declined': 'declined'
+    }
+    return map[statusStr] ?? 'pending'
+  }
+
+  function parseGroup(groupStr: string): GuestGroup {
+    const map: Record<string, GuestGroup> = {
+      '男方': 'groom',
+      '新郎': 'groom',
+      'groom': 'groom',
+      '女方': 'bride',
+      '新娘': 'bride',
+      'bride': 'bride',
+      '双方': 'both',
+      '共同': 'both',
+      'both': 'both'
+    }
+    return map[groupStr] ?? 'both'
+  }
+
+  function parseAttendance(status: GuestStatus): Guest['attendance'] {
+    switch (status) {
+      case 'confirmed': return '已确认'
+      case 'pending': return '待确认'
+      case 'declined': return '未出席'
+    }
+  }
+
+  function importFromExcel(file: File): Promise<ImportResult> {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader()
+      reader.onload = (e) => {
+        try {
+          const data = new Uint8Array(e.target?.result as ArrayBuffer)
+          const workbook = XLSX.read(data, { type: 'array' })
+          const sheetName = workbook.SheetNames[0]
+          const worksheet = workbook.Sheets[sheetName]
+          const rows = XLSX.utils.sheet_to_json<any>(worksheet)
+
+          const result: ImportResult = {
+            success: 0,
+            failed: 0,
+            errors: []
+          }
+
+          rows.forEach((row, index) => {
+            const rowNum = index + 2
+            try {
+              const name = String(row['姓名'] ?? row['name'] ?? '').trim()
+              const phone = String(row['电话'] ?? row['phone'] ?? row['手机'] ?? '').trim()
+
+              if (!name) {
+                throw new Error(`第${rowNum}行：姓名不能为空`)
+              }
+
+              const statusStr = String(row['状态'] ?? row['出席状态'] ?? row['status'] ?? 'pending').trim()
+              const status = parseStatus(statusStr)
+              const groupStr = String(row['分组'] ?? row['归属'] ?? row['group'] ?? 'both').trim()
+              const group = parseGroup(groupStr)
+              const tableRaw = row['桌号'] ?? row['桌次'] ?? row['tableNumber'] ?? row['table']
+              let tableNumber: number | null = null
+              if (tableRaw !== undefined && tableRaw !== null && tableRaw !== '') {
+                const num = Number(tableRaw)
+                if (!isNaN(num) && num > 0) {
+                  tableNumber = Math.floor(num)
+                }
+              }
+
+              if (status === 'declined') {
+                tableNumber = null
+              }
+
+              const avatar = name.charAt(0)
+
+              addGuest({
+                name,
+                phone,
+                group,
+                status,
+                attendance: parseAttendance(status),
+                tableNumber,
+                avatar
+              })
+
+              result.success++
+            } catch (err: any) {
+              result.failed++
+              result.errors.push(err.message || `第${rowNum}行：导入失败`)
+            }
+          })
+
+          resolve(result)
+        } catch (err: any) {
+          reject(new Error('Excel 文件解析失败：' + (err.message || '格式不正确')))
+        }
+      }
+      reader.onerror = () => reject(new Error('文件读取失败'))
+      reader.readAsArrayBuffer(file)
+    })
+  }
+
+  function exportToExcel(): void {
+    const exportData = guests.value.map(g => ({
+      '姓名': g.name,
+      '电话': g.phone,
+      '分组': g.group === 'groom' ? '男方' : g.group === 'bride' ? '女方' : '双方',
+      '状态': g.status === 'confirmed' ? '已确认' : g.status === 'pending' ? '待确认' : '未出席',
+      '桌号': g.tableNumber ?? '',
+      '归属': g.group === 'groom' ? '男方' : g.group === 'bride' ? '女方' : '双方'
+    }))
+
+    const worksheet = XLSX.utils.json_to_sheet(exportData)
+    worksheet['!cols'] = [
+      { wch: 12 },
+      { wch: 15 },
+      { wch: 10 },
+      { wch: 10 },
+      { wch: 8 },
+      { wch: 10 }
+    ]
+    const workbook = XLSX.utils.book_new()
+    XLSX.utils.book_append_sheet(workbook, worksheet, '宾客名单')
+
+    const now = new Date()
+    const dateStr = `${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, '0')}${String(now.getDate()).padStart(2, '0')}`
+    XLSX.writeFile(workbook, `宾客名单_${dateStr}.xlsx`)
+  }
+
+  function downloadTemplate(): void {
+    const templateData = [
+      { '姓名': '张三', '电话': '13800138000', '分组': '男方', '状态': '已确认', '桌号': 1 },
+      { '姓名': '李四', '电话': '13800138001', '分组': '女方', '状态': '待确认', '桌号': '' },
+      { '姓名': '王五', '电话': '13800138002', '分组': '双方', '状态': '未出席', '桌号': '' }
+    ]
+    const worksheet = XLSX.utils.json_to_sheet(templateData)
+    worksheet['!cols'] = [
+      { wch: 12 },
+      { wch: 15 },
+      { wch: 10 },
+      { wch: 10 },
+      { wch: 8 }
+    ]
+    const workbook = XLSX.utils.book_new()
+    XLSX.utils.book_append_sheet(workbook, worksheet, '导入模板')
+    XLSX.writeFile(workbook, '宾客名单导入模板.xlsx')
+  }
+
+  function batchUpdateStatus(guestIds: string[], status: GuestStatus): void {
+    guestIds.forEach(id => {
+      updateGuest(id, { status })
+    })
+  }
+
   return {
     guests,
     addGuest,
@@ -187,6 +393,12 @@ export const useGuestsStore = defineStore('guests', () => {
     capacityOverflow,
     validateTableAssignment,
     updateGuestTable,
-    capacityWarning
+    capacityWarning,
+    tableStats,
+    tableCount,
+    importFromExcel,
+    exportToExcel,
+    downloadTemplate,
+    batchUpdateStatus
   }
 })

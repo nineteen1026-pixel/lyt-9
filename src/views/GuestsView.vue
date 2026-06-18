@@ -1,7 +1,10 @@
 <script setup lang="ts">
 import { ref, computed, watch } from 'vue'
 import { useGuestsStore, type Guest, type GuestStatus, type GuestGroup } from '@/stores/guests'
-import { Search, Users, CheckCircle, Clock, XCircle, Utensils, Edit3, X, AlertTriangle, Info } from 'lucide-vue-next'
+import {
+  Search, Users, CheckCircle, Clock, XCircle, Utensils, Edit3, X, AlertTriangle, Info,
+  Upload, Download, FileSpreadsheet, ChevronDown, ChevronUp, Layers
+} from 'lucide-vue-next'
 import Toast from '@/components/Toast.vue'
 
 const guestsStore = useGuestsStore()
@@ -12,6 +15,10 @@ const activeGroup = ref<GuestGroup | 'all'>('all')
 const showTableModal = ref(false)
 const selectedGuest = ref<Guest | null>(null)
 const editingTableNumber = ref<number | null>(null)
+
+const showTableStats = ref(false)
+const isImporting = ref(false)
+const fileInputRef = ref<HTMLInputElement | null>(null)
 
 const toastVisible = ref(false)
 const toastMessage = ref('')
@@ -41,6 +48,12 @@ const groupFilters: { key: GuestGroup | 'all'; label: string }[] = [
   { key: 'bride', label: '女方' },
   { key: 'both', label: '双方' },
 ]
+
+const nextStatusMap: Record<GuestStatus, GuestStatus> = {
+  confirmed: 'pending',
+  pending: 'declined',
+  declined: 'confirmed'
+}
 
 const filteredGuests = computed(() => {
   return guestsStore.guests.filter(guest => {
@@ -131,6 +144,59 @@ const saveTableNumber = () => {
 const clearTableNumber = () => {
   editingTableNumber.value = null
 }
+
+const cycleStatus = (guest: Guest) => {
+  const nextStatus = nextStatusMap[guest.status]
+  const oldTableNumber = guest.tableNumber
+  guestsStore.updateGuest(guest.id, { status: nextStatus })
+
+  const nextConfig = getStatusConfig(nextStatus)
+  if (nextStatus === 'declined' && oldTableNumber !== null) {
+    showToast('状态已更新', `${guest.name} 状态变更为「${nextConfig.label}」，已自动取消 ${oldTableNumber}号桌分桌`, 'info', 3500)
+  } else {
+    showToast('状态已更新', `${guest.name} 状态变更为「${nextConfig.label}」`, 'success')
+  }
+}
+
+const handleExport = () => {
+  guestsStore.exportToExcel()
+  showToast('导出成功', `已导出 ${guestsStore.totalCount} 位宾客信息`, 'success')
+}
+
+const handleDownloadTemplate = () => {
+  guestsStore.downloadTemplate()
+  showToast('模板已下载', '请按模板格式填写后导入', 'info')
+}
+
+const handleImportClick = () => {
+  fileInputRef.value?.click()
+}
+
+const handleFileChange = async (event: Event) => {
+  const input = event.target as HTMLInputElement
+  const file = input.files?.[0]
+  if (!file) return
+
+  isImporting.value = true
+  try {
+    const result = await guestsStore.importFromExcel(file)
+    if (result.failed > 0) {
+      showToast(
+        `导入完成：成功 ${result.success} 条，失败 ${result.failed} 条`,
+        result.errors.slice(0, 3).join('；') + (result.errors.length > 3 ? '...' : ''),
+        'warning',
+        5000
+      )
+    } else {
+      showToast('导入成功', `成功导入 ${result.success} 位宾客`, 'success')
+    }
+  } catch (err: any) {
+    showToast('导入失败', err.message || '请检查文件格式', 'error', 4000)
+  } finally {
+    isImporting.value = false
+    input.value = ''
+  }
+}
 </script>
 
 <template>
@@ -162,9 +228,35 @@ const clearTableNumber = () => {
             </p>
             <p class="text-xs text-gray-500">已分配/场地容量</p>
           </div>
-          <div class="animate-slide-up bg-white rounded-2xl p-3 shadow-md text-center" style="animation-delay: 0.3s">
-            <p class="text-2xl font-bold text-red-500">{{ guestsStore.declinedCount }}</p>
-            <p class="text-xs text-gray-500">缺席</p>
+          <div class="animate-slide-up bg-white rounded-2xl p-3 shadow-md text-center cursor-pointer hover:shadow-lg transition-shadow" style="animation-delay: 0.3s" @click="showTableStats = !showTableStats">
+            <div class="flex items-center justify-center gap-1">
+              <p class="text-2xl font-bold text-champagne-500">{{ guestsStore.tableCount }}</p>
+              <component :is="showTableStats ? ChevronUp : ChevronDown" class="w-4 h-4 text-champagne-400" />
+            </div>
+            <p class="text-xs text-gray-500">桌次</p>
+          </div>
+        </div>
+
+        <div v-if="showTableStats && guestsStore.tableStats.length > 0" class="animate-fade-in bg-white rounded-2xl p-4 shadow-md mb-4">
+          <div class="flex items-center gap-2 mb-3">
+            <Layers class="w-5 h-5 text-champagne-500" />
+            <h3 class="font-bold text-gray-800">桌次分布</h3>
+            <span class="text-xs text-gray-400">共 {{ guestsStore.tableCount }} 桌 / {{ guestsStore.assignedGuestsCount }} 人</span>
+          </div>
+          <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2">
+            <div
+              v-for="table in guestsStore.tableStats"
+              :key="table.tableNumber"
+              class="bg-champagne-50 rounded-xl p-2 border border-champagne-100"
+            >
+              <div class="flex items-center justify-between mb-1">
+                <span class="text-sm font-bold text-primary-600">{{ table.tableNumber }}号桌</span>
+                <span class="text-xs bg-champagne-200 text-champagne-300 px-2 py-0.5 rounded-full">{{ table.count }}人</span>
+              </div>
+              <p class="text-xs text-gray-500 truncate">
+                {{ table.guests.map(g => g.name).join('、') }}
+              </p>
+            </div>
           </div>
         </div>
 
@@ -177,6 +269,38 @@ const clearTableNumber = () => {
               <p class="text-sm mt-1" :class="guestsStore.hasBookedVenue ? 'text-red-600' : 'text-yellow-600'">{{ guestsStore.capacityWarning.content }}</p>
             </div>
           </div>
+        </div>
+
+        <div class="animate-slide-up grid grid-cols-3 gap-2 mb-4" style="animation-delay: 0.38s">
+          <button
+            @click="handleImportClick"
+            :disabled="isImporting"
+            class="flex items-center justify-center gap-1.5 px-3 py-2.5 bg-white rounded-xl shadow-sm hover:shadow-md transition-all text-sm font-medium text-primary-600 border border-primary-100 hover:bg-primary-50 disabled:opacity-60"
+          >
+            <Upload class="w-4 h-4" />
+            {{ isImporting ? '导入中...' : '导入' }}
+          </button>
+          <input
+            ref="fileInputRef"
+            type="file"
+            accept=".xlsx,.xls"
+            class="hidden"
+            @change="handleFileChange"
+          />
+          <button
+            @click="handleExport"
+            class="flex items-center justify-center gap-1.5 px-3 py-2.5 bg-white rounded-xl shadow-sm hover:shadow-md transition-all text-sm font-medium text-green-600 border border-green-100 hover:bg-green-50"
+          >
+            <Download class="w-4 h-4" />
+            导出
+          </button>
+          <button
+            @click="handleDownloadTemplate"
+            class="flex items-center justify-center gap-1.5 px-3 py-2.5 bg-white rounded-xl shadow-sm hover:shadow-md transition-all text-sm font-medium text-champagne-500 border border-champagne-200 hover:bg-champagne-50"
+          >
+            <FileSpreadsheet class="w-4 h-4" />
+            模板
+          </button>
         </div>
 
         <div class="animate-slide-up bg-white rounded-2xl p-3 shadow-md mb-4 flex items-center gap-3" style="animation-delay: 0.4s">
@@ -235,12 +359,14 @@ const clearTableNumber = () => {
               <div class="flex-1 min-w-0">
                 <div class="flex items-center gap-2">
                   <p class="font-medium text-gray-800">{{ guest.name }}</p>
-                  <span 
-                    class="px-2 py-0.5 rounded-full text-xs"
+                  <button
+                    @click="cycleStatus(guest)"
+                    class="px-2 py-0.5 rounded-full text-xs cursor-pointer transition-all hover:scale-105 active:scale-95"
                     :class="getStatusConfig(guest.status).class"
+                    :title="'点击切换状态：已确认 → 待定 → 缺席 → 已确认'"
                   >
                     {{ getStatusConfig(guest.status).label }}
-                  </span>
+                  </button>
                 </div>
                 <p class="text-sm text-gray-400 mt-0.5">{{ guest.phone }}</p>
                 <div class="flex items-center gap-3 mt-1">
@@ -267,6 +393,13 @@ const clearTableNumber = () => {
         <div v-if="filteredGuests.length === 0" class="animate-fade-in text-center py-16">
           <Users class="w-16 h-16 text-gray-300 mx-auto mb-4" />
           <p class="text-gray-400">暂无符合条件的宾客</p>
+          <button
+            v-if="guestsStore.totalCount === 0"
+            @click="handleDownloadTemplate"
+            class="mt-4 px-4 py-2 bg-primary-500 text-white rounded-full text-sm font-medium hover:bg-primary-600 transition-colors"
+          >
+            下载模板批量导入
+          </button>
         </div>
       </div>
     </div>
