@@ -86,7 +86,7 @@ const filteredGuests = computed(() => {
   return guestsStore.guests.filter(guest => {
     const matchesSearch = guest.name.includes(searchQuery.value) || guest.phone.includes(searchQuery.value)
     const matchesStatus = activeFilter.value === 'all' || guest.status === activeFilter.value
-    const matchesGroup = activeGroup.value === 'all' || guest.group === activeGroup.value
+    const matchesGroup = matchGuestGroup(guest.group, activeGroup.value)
     return matchesSearch && matchesStatus && matchesGroup
   })
 })
@@ -110,6 +110,12 @@ const getGroupLabel = (group: GuestGroup) => {
   }
 }
 
+const matchGuestGroup = (guestGroup: GuestGroup, filterGroup: GuestGroup | 'all'): boolean => {
+  if (filterGroup === 'all') return true
+  if (filterGroup === 'both') return guestGroup === 'both'
+  return guestGroup === filterGroup || guestGroup === 'both'
+}
+
 const getAvatarColor = (name: string) => {
   const colors = [
     'bg-primary-400',
@@ -129,7 +135,7 @@ const filteredTableStats = computed(() => {
       displayGuests: table.guests.filter(guest => {
         const matchesSearch = guest.name.includes(searchQuery.value) || guest.phone.includes(searchQuery.value)
         const matchesStatus = activeFilter.value === 'all' || guest.status === activeFilter.value
-        const matchesGroup = activeGroup.value === 'all' || guest.group === activeGroup.value
+        const matchesGroup = matchGuestGroup(guest.group, activeGroup.value)
         return matchesSearch && matchesStatus && matchesGroup
       })
     }))
@@ -144,7 +150,7 @@ const unassignedFilteredGuests = computed(() => {
   return guestsStore.guests.filter(guest => {
     const matchesSearch = guest.name.includes(searchQuery.value) || guest.phone.includes(searchQuery.value)
     const matchesStatus = activeFilter.value === 'all' || guest.status === activeFilter.value
-    const matchesGroup = activeGroup.value === 'all' || guest.group === activeGroup.value
+    const matchesGroup = matchGuestGroup(guest.group, activeGroup.value)
     const isUnassigned = guest.tableNumber === null || guest.status === 'declined'
     return matchesSearch && matchesStatus && matchesGroup && isUnassigned
   })
