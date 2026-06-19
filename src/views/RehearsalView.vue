@@ -1,10 +1,20 @@
 <script setup lang="ts">
 import { ref } from 'vue'
 import { useRehearsalStore } from '@/stores/rehearsal'
-import { Calendar, Clock, MapPin, Phone, Users, ChevronDown, ChevronUp, AlertCircle } from 'lucide-vue-next'
+import { Calendar, Clock, MapPin, Phone, Users, ChevronDown, ChevronUp, AlertCircle, Edit2, Check, X, Plus, Trash2 } from 'lucide-vue-next'
+import type { StaffMember, RehearsalStep } from '@/data/mockData'
 
 const rehearsalStore = useRehearsalStore()
 const expandedNotice = ref<string | null>('1')
+
+const editingStaffId = ref<string | null>(null)
+const editStaffForm = ref<Partial<StaffMember>>({ name: '', role: '', phone: '' })
+
+const showAddStaff = ref(false)
+const addStaffForm = ref({ name: '', role: '', phone: '' })
+
+const editingStepId = ref<string | null>(null)
+const editStepPerson = ref('')
 
 const toggleNotice = (id: string) => {
   expandedNotice.value = expandedNotice.value === id ? null : id
@@ -25,6 +35,67 @@ const getStepNumberColor = (index: number) => {
     'bg-morandi-blue',
   ]
   return colors[index % colors.length]
+}
+
+const startEditStaff = (member: StaffMember) => {
+  editingStaffId.value = member.id
+  editStaffForm.value = { ...member }
+}
+
+const cancelEditStaff = () => {
+  editingStaffId.value = null
+  editStaffForm.value = { name: '', role: '', phone: '' }
+}
+
+const saveEditStaff = () => {
+  if (editingStaffId.value && editStaffForm.value.name?.trim()) {
+    rehearsalStore.updateStaff(editingStaffId.value, editStaffForm.value)
+  }
+  cancelEditStaff()
+}
+
+const openAddStaff = () => {
+  showAddStaff.value = true
+  addStaffForm.value = { name: '', role: '', phone: '' }
+}
+
+const cancelAddStaff = () => {
+  showAddStaff.value = false
+  addStaffForm.value = { name: '', role: '', phone: '' }
+}
+
+const saveAddStaff = () => {
+  if (addStaffForm.value.name.trim()) {
+    rehearsalStore.addStaff({
+      name: addStaffForm.value.name.trim(),
+      role: addStaffForm.value.role || '工作人员',
+      phone: addStaffForm.value.phone
+    })
+  }
+  cancelAddStaff()
+}
+
+const removeStaff = (id: string) => {
+  if (confirm('确定要删除该人员吗？相关流程中的负责人将被清空。')) {
+    rehearsalStore.deleteStaff(id)
+  }
+}
+
+const startEditStep = (step: RehearsalStep) => {
+  editingStepId.value = step.id
+  editStepPerson.value = step.personInCharge
+}
+
+const cancelEditStep = () => {
+  editingStepId.value = null
+  editStepPerson.value = ''
+}
+
+const saveEditStep = () => {
+  if (editingStepId.value) {
+    rehearsalStore.updateStep(editingStepId.value, { personInCharge: editStepPerson.value })
+  }
+  cancelEditStep()
 }
 </script>
 
@@ -81,7 +152,10 @@ const getStepNumberColor = (index: number) => {
         </div>
 
         <div class="animate-slide-up mb-6" style="animation-delay: 0.2s">
-          <h2 class="text-lg font-bold text-gray-800 mb-4">流程步骤</h2>
+          <div class="flex items-center justify-between mb-4">
+            <h2 class="text-lg font-bold text-gray-800">流程步骤</h2>
+            <span class="text-xs text-primary-400">点击负责人可编辑</span>
+          </div>
           <div class="space-y-3">
             <div 
               v-for="(step, index) in rehearsalStore.steps" 
@@ -101,7 +175,34 @@ const getStepNumberColor = (index: number) => {
                 </div>
                 <p class="text-sm text-gray-500 mb-2">{{ step.description }}</p>
                 <div class="flex items-center gap-4 text-xs text-gray-400">
-                  <span>负责人: {{ step.personInCharge }}</span>
+                  <template v-if="editingStepId === step.id">
+                    <div class="flex items-center gap-2">
+                      <span class="text-gray-500">负责人:</span>
+                      <input
+                        v-model="editStepPerson"
+                        type="text"
+                        class="px-2 py-1 border border-primary-200 rounded-lg text-sm w-36 outline-none focus:ring-2 focus:ring-primary-300"
+                        placeholder="输入负责人"
+                        @keyup.enter="saveEditStep"
+                        @keyup.escape="cancelEditStep"
+                      />
+                      <button @click="saveEditStep" class="p-1 text-morandi-green hover:bg-morandi-green/10 rounded">
+                        <Check class="w-4 h-4" />
+                      </button>
+                      <button @click="cancelEditStep" class="p-1 text-red-400 hover:bg-red-50 rounded">
+                        <X class="w-4 h-4" />
+                      </button>
+                    </div>
+                  </template>
+                  <template v-else>
+                    <button 
+                      @click="startEditStep(step)"
+                      class="flex items-center gap-1 hover:text-primary-500 transition-colors"
+                    >
+                      <span>负责人: {{ step.personInCharge }}</span>
+                      <Edit2 class="w-3 h-3" />
+                    </button>
+                  </template>
                   <span v-if="step.notes">备注: {{ step.notes }}</span>
                 </div>
               </div>
@@ -110,37 +211,167 @@ const getStepNumberColor = (index: number) => {
         </div>
 
         <div class="animate-slide-up bg-white rounded-2xl p-5 shadow-md mb-6" style="animation-delay: 0.5s">
-          <h2 class="text-lg font-bold text-gray-800 mb-4 flex items-center gap-2">
-            <Users class="w-5 h-5 text-primary-400" />
-            人员分工
-          </h2>
+          <div class="flex items-center justify-between mb-4">
+            <h2 class="text-lg font-bold text-gray-800 flex items-center gap-2">
+              <Users class="w-5 h-5 text-primary-400" />
+              人员分工
+            </h2>
+            <button
+              @click="openAddStaff"
+              class="flex items-center gap-1 px-3 py-1.5 bg-primary-100 text-primary-500 rounded-lg text-sm font-medium hover:bg-primary-200 transition-colors"
+            >
+              <Plus class="w-4 h-4" />
+              添加
+            </button>
+          </div>
+
+          <div v-if="showAddStaff" class="mb-4 p-4 bg-primary-50/50 rounded-xl border border-primary-100">
+            <div class="space-y-3">
+              <div class="grid grid-cols-3 gap-3">
+                <div>
+                  <label class="text-xs text-gray-500 mb-1 block">姓名 *</label>
+                  <input
+                    v-model="addStaffForm.name"
+                    type="text"
+                    placeholder="输入姓名"
+                    class="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-primary-300"
+                  />
+                </div>
+                <div>
+                  <label class="text-xs text-gray-500 mb-1 block">角色</label>
+                  <input
+                    v-model="addStaffForm.role"
+                    type="text"
+                    placeholder="如：司仪、摄影"
+                    class="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-primary-300"
+                  />
+                </div>
+                <div>
+                  <label class="text-xs text-gray-500 mb-1 block">电话</label>
+                  <input
+                    v-model="addStaffForm.phone"
+                    type="text"
+                    placeholder="联系电话"
+                    class="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-primary-300"
+                  />
+                </div>
+              </div>
+              <div class="flex justify-end gap-2">
+                <button
+                  @click="cancelAddStaff"
+                  class="px-4 py-2 text-gray-500 rounded-lg text-sm hover:bg-gray-100 transition-colors"
+                >
+                  取消
+                </button>
+                <button
+                  @click="saveAddStaff"
+                  class="px-4 py-2 bg-primary-500 text-white rounded-lg text-sm hover:bg-primary-600 transition-colors"
+                >
+                  确认添加
+                </button>
+              </div>
+            </div>
+          </div>
+
           <div class="space-y-3">
             <div 
               v-for="(person, index) in rehearsalStore.staff" 
               :key="person.id"
-              class="flex items-center justify-between p-3 bg-primary-50/50 rounded-xl"
+              class="rounded-xl"
+              :class="[
+                editingStaffId === person.id ? 'bg-primary-50 border border-primary-200 p-3' : 'flex items-center justify-between p-3 bg-primary-50/50',
+              ]"
               :style="{ animationDelay: `${0.6 + index * 0.1}s` }"
             >
-              <div class="flex items-center gap-3">
-                <div 
-                  class="w-10 h-10 rounded-full flex items-center justify-center text-white font-bold"
-                  :class="[
-                    person.role.includes('司仪') ? 'bg-primary-400' :
-                    person.role.includes('摄影') ? 'bg-champagne-300' :
-                    person.role.includes('摄像') ? 'bg-morandi-purple' :
-                    person.role.includes('化妆') ? 'bg-morandi-green' :
-                    person.role.includes('督导') ? 'bg-morandi-blue' :
-                    'bg-primary-400'
-                  ]"
-                >
-                  {{ person.name.charAt(0) }}
+              <template v-if="editingStaffId === person.id">
+                <div class="space-y-3 w-full">
+                  <div class="grid grid-cols-3 gap-3">
+                    <div>
+                      <label class="text-xs text-gray-500 mb-1 block">姓名 *</label>
+                      <input
+                        v-model="editStaffForm.name"
+                        type="text"
+                        placeholder="输入姓名"
+                        class="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-primary-300 bg-white"
+                      />
+                    </div>
+                    <div>
+                      <label class="text-xs text-gray-500 mb-1 block">角色</label>
+                      <input
+                        v-model="editStaffForm.role"
+                        type="text"
+                        placeholder="如：司仪、摄影"
+                        class="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-primary-300 bg-white"
+                      />
+                    </div>
+                    <div>
+                      <label class="text-xs text-gray-500 mb-1 block">电话</label>
+                      <input
+                        v-model="editStaffForm.phone"
+                        type="text"
+                        placeholder="联系电话"
+                        class="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-primary-300 bg-white"
+                      />
+                    </div>
+                  </div>
+                  <div class="flex justify-end gap-2">
+                    <button
+                      @click="cancelEditStaff"
+                      class="flex items-center gap-1 px-3 py-1.5 text-gray-500 rounded-lg text-sm hover:bg-gray-100 transition-colors"
+                    >
+                      <X class="w-4 h-4" />
+                      取消
+                    </button>
+                    <button
+                      @click="saveEditStaff"
+                      class="flex items-center gap-1 px-3 py-1.5 bg-primary-500 text-white rounded-lg text-sm hover:bg-primary-600 transition-colors"
+                    >
+                      <Check class="w-4 h-4" />
+                      保存
+                    </button>
+                  </div>
                 </div>
-                <div>
-                  <p class="font-medium text-gray-800 text-sm">{{ person.name }}</p>
-                  <p class="text-xs text-gray-500">{{ person.role }}</p>
+              </template>
+              <template v-else>
+                <div class="flex items-center gap-3">
+                  <div 
+                    class="w-10 h-10 rounded-full flex items-center justify-center text-white font-bold"
+                    :class="[
+                      person.role.includes('司仪') ? 'bg-primary-400' :
+                      person.role.includes('摄影') ? 'bg-champagne-300' :
+                      person.role.includes('摄像') ? 'bg-morandi-purple' :
+                      person.role.includes('化妆') ? 'bg-morandi-green' :
+                      person.role.includes('督导') ? 'bg-morandi-blue' :
+                      'bg-primary-400'
+                    ]"
+                  >
+                    {{ person.name.charAt(0) }}
+                  </div>
+                  <div>
+                    <p class="font-medium text-gray-800 text-sm">{{ person.name }}</p>
+                    <p class="text-xs text-gray-500">{{ person.role }}</p>
+                  </div>
                 </div>
-              </div>
-              <span class="text-sm text-gray-400">{{ person.phone }}</span>
+                <div class="flex items-center gap-3">
+                  <span class="text-sm text-gray-400">{{ person.phone }}</span>
+                  <div class="flex items-center gap-1">
+                    <button
+                      @click="startEditStaff(person)"
+                      class="p-2 text-gray-400 hover:text-primary-500 hover:bg-primary-50 rounded-lg transition-colors"
+                      title="编辑"
+                    >
+                      <Edit2 class="w-4 h-4" />
+                    </button>
+                    <button
+                      @click="removeStaff(person.id)"
+                      class="p-2 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors"
+                      title="删除"
+                    >
+                      <Trash2 class="w-4 h-4" />
+                    </button>
+                  </div>
+                </div>
+              </template>
             </div>
           </div>
         </div>

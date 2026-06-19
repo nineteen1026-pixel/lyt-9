@@ -2,6 +2,7 @@ import { defineStore } from 'pinia'
 import { ref, watch } from 'vue'
 import { get, set } from '../utils/storage'
 import { mockSchedule, mockWeddingDate, type ScheduleItem } from '../data/mockData'
+import { useRehearsalStore } from './rehearsal'
 
 export { type ScheduleItem }
 
@@ -36,8 +37,15 @@ export const useScheduleStore = defineStore('schedule', () => {
   function updateItem(id: string, updates: Partial<Omit<ScheduleItem, 'id'>>) {
     const index = items.value.findIndex(item => item.id === id)
     if (index !== -1) {
+      const oldPerson = items.value[index].personInCharge
+      const newPerson = updates.personInCharge
       items.value[index] = { ...items.value[index], ...updates }
       items.value.sort((a, b) => a.time.localeCompare(b.time))
+
+      if (newPerson !== undefined && newPerson !== oldPerson) {
+        const rehearsalStore = useRehearsalStore()
+        rehearsalStore.syncFromSchedulePersonChange(oldPerson, newPerson)
+      }
     }
   }
 
