@@ -66,7 +66,8 @@ const pieData = computed(() =>
     name: item.category,
     value: item.actual,
     color: item.color,
-    overBudget: isOverBudget(item.budget, item.actual)
+    overBudget: isOverBudget(item.budget, item.actual),
+    drillable: !!categoryRoute(item.category)
   }))
 )
 
@@ -150,6 +151,10 @@ const handleSync = () => {
 const goToCategory = (category: string) => {
   const route = categoryRoute(category)
   if (route) router.push(route)
+}
+
+const handleLegendClick = (name: string) => {
+  goToCategory(name)
 }
 </script>
 
@@ -256,7 +261,7 @@ const goToCategory = (category: string) => {
 
         <div class="animate-slide-up bg-white rounded-2xl p-4 shadow-md mb-6" style="animation-delay: 0.6s">
           <h2 class="text-lg font-bold text-gray-800 mb-4">支出分布</h2>
-          <PieChart :data="pieData" class="w-full h-64" />
+          <PieChart :data="pieData" class="w-full h-64" @legend-click="handleLegendClick" />
         </div>
 
         <div class="animate-slide-up" style="animation-delay: 0.7s">

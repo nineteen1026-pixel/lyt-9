@@ -11,14 +11,20 @@ interface PieDataItem {
   value: number
   color: string
   overBudget?: boolean
+  drillable?: boolean
 }
 
 const props = defineProps<{
   data: PieDataItem[]
 }>()
 
+const emit = defineEmits<{
+  legendClick: [name: string]
+}>()
+
 const chartRef = ref<HTMLDivElement | null>(null)
 let chartInstance: echarts.ECharts | null = null
+let isRestoringSelection = false
 
 const initChart = () => {
   if (!chartRef.value) return
@@ -54,6 +60,11 @@ const initChart = () => {
           over: {
             color: '#EF4444',
             fontWeight: 'bold'
+          },
+          drill: {
+            color: '#7C3AED',
+            fontSize: 14,
+            fontWeight: 'bold'
           }
         }
       },
@@ -61,9 +72,10 @@ const initChart = () => {
         const item = props.data.find(d => d.name === name)
         if (!item) return name
         const suffix = item.overBudget ? ' (超支)' : ''
+        const drill = item.drillable ? ' {drill|›}' : ''
         return item.overBudget 
-          ? `{over|${name}${suffix}}  ¥${item.value.toLocaleString()}`
-          : `${name}${suffix}  ¥${item.value.toLocaleString()}`
+          ? `{over|${name}${suffix}}${drill}  ¥${item.value.toLocaleString()}`
+          : `${name}${suffix}${drill}  ¥${item.value.toLocaleString()}`
       }
     },
     series: [
@@ -141,6 +153,23 @@ const initChart = () => {
   }
 
   chartInstance.setOption(option)
+
+  chartInstance.on('legendselectchanged', (params: any) => {
+    if (isRestoringSelection) return
+    const clickedName = params.name
+    const clickedItem = props.data.find(d => d.name === clickedName)
+    if (clickedItem?.drillable) {
+      emit('legendClick', clickedName)
+    }
+    if (!params.selected[clickedName]) {
+      isRestoringSelection = true
+      chartInstance?.dispatchAction({
+        type: 'legendSelect',
+        name: clickedName
+      })
+      isRestoringSelection = false
+    }
+  })
 }
 
 const handleResize = () => {
@@ -169,9 +198,10 @@ watch(
             const item = props.data.find(d => d.name === name)
             if (!item) return name
             const suffix = item.overBudget ? ' (超支)' : ''
+            const drill = item.drillable ? ' {drill|›}' : ''
             return item.overBudget 
-              ? `{over|${name}${suffix}}  ¥${item.value.toLocaleString()}`
-              : `${name}${suffix}  ¥${item.value.toLocaleString()}`
+              ? `{over|${name}${suffix}}${drill}  ¥${item.value.toLocaleString()}`
+              : `${name}${suffix}${drill}  ¥${item.value.toLocaleString()}`
           }
         },
         series: [
