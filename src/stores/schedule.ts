@@ -61,7 +61,7 @@ export const useScheduleStore = defineStore('schedule', () => {
 
       if (oldPersonId !== newPersonId && !isSyncing) {
         const rehearsalStore = useRehearsalStore()
-        rehearsalStore.syncFromSchedulePersonChange(id, newPersonId, newPersonName)
+        rehearsalStore.syncFromSchedulePersonChange(id, oldPersonId, newPersonId, newPersonName)
       }
     }
   }
@@ -79,7 +79,7 @@ export const useScheduleStore = defineStore('schedule', () => {
 
     if (oldPersonId !== personId && !isSyncing) {
       const rehearsalStore = useRehearsalStore()
-      rehearsalStore.syncFromSchedulePersonChange(itemId, personId, personName)
+      rehearsalStore.syncFromSchedulePersonChange(itemId, oldPersonId, personId, personName)
     }
   }
 

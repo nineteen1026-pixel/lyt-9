@@ -83,10 +83,25 @@ export const useRehearsalStore = defineStore('rehearsal', () => {
     const index = steps.value.findIndex(s => s.id === stepId)
     if (index === -1) return
 
+    const oldPersonId = steps.value[index].personInChargeId
     steps.value[index] = {
       ...steps.value[index],
       personInChargeId: personId,
       personInCharge: personName
+    }
+
+    if (!isSyncing && oldPersonId !== personId) {
+      isSyncing = true
+      try {
+        const scheduleStore = useScheduleStore()
+        scheduleStore.items.forEach((item, sIdx) => {
+          if (item.personInChargeId === oldPersonId) {
+            scheduleStore.items[sIdx] = { ...item, personInChargeId: personId, personInCharge: personName }
+          }
+        })
+      } finally {
+        isSyncing = false
+      }
     }
   }
 
@@ -178,21 +193,55 @@ export const useRehearsalStore = defineStore('rehearsal', () => {
     }
   }
 
-  function syncFromSchedulePersonChange(_itemId: string, personId: string | undefined, personName: string) {
+  function syncFromSchedulePersonChange(itemId: string, oldPersonId: string | undefined, newPersonId: string | undefined, newPersonName: string) {
     if (isSyncing) return
 
     isSyncing = true
     try {
-      if (personId) {
-        const existingStaff = staff.value.find(m => m.id === personId)
-        if (!existingStaff && personName.trim()) {
-          const role = inferRoleFromName(personName)
-          addStaff({ name: personName, role, phone: '' })
+      if (newPersonId) {
+        const existingStaff = staff.value.find(m => m.id === newPersonId)
+        if (!existingStaff && newPersonName.trim()) {
+          const role = inferRoleFromName(newPersonName)
+          addStaff({ name: newPersonName, role, phone: '' })
+        }
+      }
+
+      if (oldPersonId) {
+        steps.value.forEach((step, idx) => {
+          if (step.personInChargeId === oldPersonId) {
+            steps.value[idx] = { ...step, personInChargeId: newPersonId, personInCharge: newPersonName }
+          }
+        })
+      } else {
+        const scheduleStore = useScheduleStore()
+        const item = scheduleStore.items.find(i => i.id === itemId)
+        if (item) {
+          const scheduleTitle = item.title
+          steps.value.forEach((step, idx) => {
+            if (step.personInChargeId === newPersonId && isStepRelatedToSchedule(step, scheduleTitle)) {
+              steps.value[idx] = { ...step, personInCharge: newPersonName }
+            }
+          })
         }
       }
     } finally {
       isSyncing = false
     }
+  }
+
+  function isStepRelatedToSchedule(step: RehearsalStep, scheduleTitle: string): boolean {
+    const titleKeywords: Record<string, string[]> = {
+      '婚礼仪式': ['仪式', '入场', '宣誓'],
+      '敬茶彩排': ['敬茶'],
+      '迎宾': ['签到'],
+      '新娘化妆': ['化妆'],
+    }
+    for (const [key, keywords] of Object.entries(titleKeywords)) {
+      if (scheduleTitle.includes(key)) {
+        return keywords.some(kw => step.title.includes(kw) || step.description.includes(kw))
+      }
+    }
+    return false
   }
 
   function inferRoleFromName(name: string): string {
