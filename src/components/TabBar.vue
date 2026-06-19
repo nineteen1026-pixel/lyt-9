@@ -8,19 +8,27 @@
         v-for="tab in tabs"
         :key="tab.path"
         @click="handleTabClick(tab.path)"
-        class="flex flex-col items-center justify-center flex-shrink-0 px-3 py-1 transition-all duration-300 ease-out"
+        class="flex flex-col items-center justify-center flex-shrink-0 px-3 py-1 transition-all duration-300 ease-out relative"
         :class="[
           isActive(tab.path)
             ? 'text-primary-500 scale-105'
             : 'text-gray-400 hover:text-gray-600'
         ]"
       >
-        <component
-          :is="tab.icon"
-          :size="22"
-          :stroke-width="isActive(tab.path) ? 2.5 : 1.5"
-          class="transition-all duration-300"
-        />
+        <div class="relative">
+          <component
+            :is="tab.icon"
+            :size="22"
+            :stroke-width="isActive(tab.path) ? 2.5 : 1.5"
+            class="transition-all duration-300"
+          />
+          <span
+            v-if="getTodoCount(tab.id) > 0"
+            class="absolute -top-1.5 -right-2 flex items-center justify-center min-w-[18px] h-[18px] px-1 text-[10px] text-white font-bold rounded-full bg-red-500 shadow-md"
+          >
+            {{ getTodoCount(tab.id) > 99 ? '99+' : getTodoCount(tab.id) }}
+          </span>
+        </div>
         <span
           class="mt-1 text-xs font-medium transition-all duration-300"
           :class="isActive(tab.path) ? 'text-primary-500' : 'text-gray-500'"
@@ -36,6 +44,7 @@
 import { computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useRoleStore } from '@/stores/role'
+import { useTodoStore } from '@/stores/todo'
 import { isModuleVisible } from '@/data/permissions'
 import {
   LayoutDashboard,
@@ -51,6 +60,11 @@ import {
 const route = useRoute()
 const router = useRouter()
 const roleStore = useRoleStore()
+const todoStore = useTodoStore()
+
+const getTodoCount = (tabId: string): number => {
+  return todoStore.getTodoCount(tabId)
+}
 
 const allTabs = [
   { path: '/overview', label: '总览', icon: LayoutDashboard, id: 'overview' },
