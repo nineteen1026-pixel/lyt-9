@@ -14,11 +14,11 @@ const roleStore = useRoleStore()
 const guestsStore = useGuestsStore()
 const searchQuery = ref('')
 const activeFilter = ref<GuestStatus | 'all'>('all')
-const activeGroup = ref<GuestGroup | 'all'>('all')
+const activeGroup = ref<GuestGroup | 'all'>(roleStore.currentRole)
 const viewMode = ref<'list' | 'table'>('list')
 
-watch(() => roleStore.currentRole, () => {
-  activeGroup.value = 'all'
+watch(() => roleStore.currentRole, (newRole) => {
+  activeGroup.value = newRole
 })
 
 const draggedGuestId = ref<string | null>(null)
@@ -155,6 +155,24 @@ const unassignedFilteredGuests = computed(() => {
     return matchesSearch && matchesStatus && matchesGroup && isUnassigned
   })
 })
+
+const topbarTableStats = computed(() => {
+  return guestsStore.tableStats
+    .map(table => ({
+      ...table,
+      displayGuests: table.guests.filter(guest => {
+        const matchesSearch = guest.name.includes(searchQuery.value) || guest.phone.includes(searchQuery.value)
+        const matchesStatus = activeFilter.value === 'all' || guest.status === activeFilter.value
+        const matchesGroup = matchGuestGroup(guest.group, activeGroup.value)
+        return matchesSearch && matchesStatus && matchesGroup
+      })
+    }))
+    .filter(table => table.displayGuests.length > 0)
+})
+
+const topbarAssignedCount = computed(() =>
+  topbarTableStats.value.reduce((sum, t) => sum + t.displayGuests.length, 0)
+)
 
 const onDragStart = (guestId: string, event: DragEvent) => {
   draggedGuestId.value = guestId
@@ -568,24 +586,24 @@ const getStrategyLabel = (strategy: string) => {
           </button>
         </div>
 
-        <div v-if="showTableStats && guestsStore.tableStats.length > 0" class="animate-fade-in bg-white rounded-2xl p-4 shadow-md mb-4">
+        <div v-if="showTableStats && topbarTableStats.length > 0" class="animate-fade-in bg-white rounded-2xl p-4 shadow-md mb-4">
           <div class="flex items-center gap-2 mb-3">
             <Layers class="w-5 h-5 text-champagne-500" />
             <h3 class="font-bold text-gray-800">桌次分布</h3>
-            <span class="text-xs text-gray-400">共 {{ guestsStore.tableCount }} 桌 / {{ guestsStore.assignedGuestsCount }} 人</span>
+            <span class="text-xs text-gray-400">共 {{ topbarTableStats.length }} 桌 / {{ topbarAssignedCount }} 人</span>
           </div>
           <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2">
             <div
-              v-for="table in guestsStore.tableStats"
+              v-for="table in topbarTableStats"
               :key="table.tableNumber"
               class="bg-champagne-50 rounded-xl p-2 border border-champagne-100"
             >
               <div class="flex items-center justify-between mb-1">
                 <span class="text-sm font-bold text-primary-600">{{ table.tableNumber }}号桌</span>
-                <span class="text-xs bg-champagne-200 text-champagne-300 px-2 py-0.5 rounded-full">{{ table.count }}人</span>
+                <span class="text-xs bg-champagne-200 text-champagne-300 px-2 py-0.5 rounded-full">{{ table.displayGuests.length }}人</span>
               </div>
               <p class="text-xs text-gray-500 truncate">
-                {{ table.guests.map(g => g.name).join('、') }}
+                {{ table.displayGuests.map(g => g.name).join('、') }}
               </p>
             </div>
           </div>
@@ -769,13 +787,13 @@ const getStrategyLabel = (strategy: string) => {
                     ? 'bg-champagne-200 text-champagne-400'
                     : 'bg-red-100 text-red-600'"
                 >
-                  {{ table.count }}/{{ guestsStore.maxGuestsPerTable }}人
+                  {{ table.displayGuests.length }}/{{ guestsStore.maxGuestsPerTable }}人
                 </span>
-                <div v-if="guestsStore.perTableValidationMap.get(table.tableNumber)?.valid && table.count > 0" class="w-16 bg-gray-200 rounded-full h-1.5 overflow-hidden">
+                <div v-if="guestsStore.perTableValidationMap.get(table.tableNumber)?.valid && table.displayGuests.length > 0" class="w-16 bg-gray-200 rounded-full h-1.5 overflow-hidden">
                   <div
                     class="h-full rounded-full transition-all duration-300"
-                    :class="table.count / guestsStore.maxGuestsPerTable > 0.8 ? 'bg-yellow-400' : 'bg-primary-400'"
-                    :style="{ width: `${Math.min((table.count / guestsStore.maxGuestsPerTable) * 100, 100)}%` }"
+                    :class="table.displayGuests.length / guestsStore.maxGuestsPerTable > 0.8 ? 'bg-yellow-400' : 'bg-primary-400'"
+                    :style="{ width: `${Math.min((table.displayGuests.length / guestsStore.maxGuestsPerTable) * 100, 100)}%` }"
                   ></div>
                 </div>
                 <AlertTriangle v-if="!guestsStore.perTableValidationMap.get(table.tableNumber)?.valid" class="w-4 h-4 text-red-500" />
