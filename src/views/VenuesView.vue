@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import { ref, computed } from 'vue'
-import { useRouter } from 'vue-router'
+import { ref, computed, onMounted, nextTick } from 'vue'
+import { useRouter, useRoute } from 'vue-router'
 import { useVenuesStore, type Venue } from '@/stores/venues'
 import { useBudgetStore } from '@/stores/budget'
 import { MapPin, Users, Tag, Plus, Filter, ArrowUpDown, SlidersHorizontal, ArrowLeftRight } from 'lucide-vue-next'
@@ -11,8 +11,11 @@ import ConfirmSelectionModal from '@/components/ConfirmSelectionModal.vue'
 import Toast from '@/components/Toast.vue'
 
 const router = useRouter()
+const route = useRoute()
 const venuesStore = useVenuesStore()
 const budgetStore = useBudgetStore()
+
+const drillMode = ref(false)
 
 const showFormModal = ref(false)
 const showCompareModal = ref(false)
@@ -186,6 +189,36 @@ const selectFromCompare = (id: string) => {
 const toggleSortDesc = () => {
   sortDesc.value = !sortDesc.value
 }
+
+onMounted(() => {
+  if (route.query.drill === '1') {
+    drillMode.value = true
+    filterStatus.value = 'contracted'
+    showFilter.value = true
+    const fromLabel = route.query.from === 'overview' ? '总览' : '预算'
+    const contractedList = venuesStore.venues.filter(v => v.contracted)
+    if (contractedList.length > 0) {
+      showToast(
+        '已自动定位已确认方案',
+        `来自${fromLabel}页饼图下钻 · 共 ${contractedList.length} 项已确认方案`,
+        'success',
+        3000
+      )
+    } else {
+      showToast(
+        '暂无已确认方案',
+        `来自${fromLabel}页饼图下钻 · 请先确认选型`,
+        'info',
+        3000
+      )
+    }
+    nextTick(() => {
+      setTimeout(() => {
+        drillMode.value = false
+      }, 3500)
+    })
+  }
+})
 </script>
 
 <template>
@@ -324,25 +357,32 @@ const toggleSortDesc = () => {
             class="animate-slide-up"
             :style="{ animationDelay: `${0.15 + index * 0.08}s` }"
           >
-            <OptionCard
-              :option="venue"
-              :title="venue.name"
-              :subtitle="venue.address"
-              :image="venue.image"
-              :tags="venue.features"
-              :meta-items="[
-                { icon: MapPin, label: '地址', value: venue.address },
-                { icon: Users, label: '容纳', value: `${venue.capacity}人` },
-                { icon: Tag, label: '报价', value: formatPrice(venue.price) }
+            <div
+              :class="[
+                'rounded-2xl transition-all duration-700',
+                drillMode && venue.contracted ? 'ring-4 ring-green-400 ring-offset-2 ring-offset-transparent shadow-xl scale-[1.02] animate-pulse' : ''
               ]"
-              :selected-for-compare="compareIds.includes(venue.id)"
-              :disabled="!venue.contracted && hasBookedVenue"
-              @sign="openConfirmModal"
-              @cancel="handleCancelContract"
-              @edit="openEditModal"
-              @delete="handleDelete"
-              @toggle-compare="toggleCompare"
-            />
+            >
+              <OptionCard
+                :option="venue"
+                :title="venue.name"
+                :subtitle="venue.address"
+                :image="venue.image"
+                :tags="venue.features"
+                :meta-items="[
+                  { icon: MapPin, label: '地址', value: venue.address },
+                  { icon: Users, label: '容纳', value: `${venue.capacity}人` },
+                  { icon: Tag, label: '报价', value: formatPrice(venue.price) }
+                ]"
+                :selected-for-compare="compareIds.includes(venue.id)"
+                :disabled="!venue.contracted && hasBookedVenue"
+                @sign="openConfirmModal"
+                @cancel="handleCancelContract"
+                @edit="openEditModal"
+                @delete="handleDelete"
+                @toggle-compare="toggleCompare"
+              />
+            </div>
           </div>
         </div>
       </div>

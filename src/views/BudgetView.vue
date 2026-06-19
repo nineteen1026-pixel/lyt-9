@@ -150,7 +150,12 @@ const handleSync = () => {
 
 const goToCategory = (category: string) => {
   const route = categoryRoute(category)
-  if (route) router.push(route)
+  if (route) {
+    router.push({
+      path: route,
+      query: { drill: '1', from: 'budget' }
+    })
+  }
 }
 
 const handleLegendClick = (name: string) => {

@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import { ref, computed } from 'vue'
-import { useRouter } from 'vue-router'
+import { ref, computed, onMounted, nextTick } from 'vue'
+import { useRouter, useRoute } from 'vue-router'
 import { useDressStore, type Dress, type DressCategory } from '@/stores/dress'
 import { useBudgetStore } from '@/stores/budget'
 import { Shirt, Tag, Ruler, Calendar, Palette as DressPalette, Plus, Filter, ArrowUpDown, SlidersHorizontal, ArrowLeftRight } from 'lucide-vue-next'
@@ -11,8 +11,11 @@ import ConfirmSelectionModal from '@/components/ConfirmSelectionModal.vue'
 import Toast from '@/components/Toast.vue'
 
 const router = useRouter()
+const route = useRoute()
 const dressStore = useDressStore()
 const budgetStore = useBudgetStore()
+
+const drillMode = ref(false)
 
 const showFormModal = ref(false)
 const showCompareModal = ref(false)
@@ -230,6 +233,36 @@ const typeTabStyle = (type: DressCategory | 'all') =>
   activeTypeTab.value === type
     ? 'bg-primary-500 text-white shadow-md'
     : 'bg-white text-gray-600 hover:bg-primary-50'
+
+onMounted(() => {
+  if (route.query.drill === '1') {
+    drillMode.value = true
+    filterStatus.value = 'contracted'
+    showFilter.value = true
+    const fromLabel = route.query.from === 'overview' ? '总览' : '预算'
+    const contractedList = dressStore.dresses.filter(d => d.contracted)
+    if (contractedList.length > 0) {
+      showToast(
+        '已自动定位已确认方案',
+        `来自${fromLabel}页饼图下钻 · 共 ${contractedList.length} 项已确认方案`,
+        'success',
+        3000
+      )
+    } else {
+      showToast(
+        '暂无已确认方案',
+        `来自${fromLabel}页饼图下钻 · 请先确认选型`,
+        'info',
+        3000
+      )
+    }
+    nextTick(() => {
+      setTimeout(() => {
+        drillMode.value = false
+      }, 3500)
+    })
+  }
+})
 </script>
 
 <template>
@@ -387,26 +420,33 @@ const typeTabStyle = (type: DressCategory | 'all') =>
             class="animate-slide-up"
             :style="{ animationDelay: `${0.15 + index * 0.08}s` }"
           >
-            <OptionCard
-              :option="dress"
-              :title="dress.name"
-              :subtitle="`${dress.brand} · ${dress.type}`"
-              :image="dress.image"
-              :tags="[dress.type, dress.style, dress.color]"
-              :meta-items="[
-                { icon: DressPalette, label: '品牌', value: dress.brand },
-                { icon: Ruler, label: '尺码', value: dress.size },
-                { icon: Shirt, label: '颜色', value: dress.color },
-                { icon: Calendar, label: '试纱', value: dress.fittingDate || '待定' }
+            <div
+              :class="[
+                'rounded-2xl transition-all duration-700',
+                drillMode && dress.contracted ? 'ring-4 ring-green-400 ring-offset-2 ring-offset-transparent shadow-xl scale-[1.02] animate-pulse' : ''
               ]"
-              :selected-for-compare="compareIds.includes(dress.id)"
-              :is-changing="!dress.contracted && hasContractedByType(dress.type)"
-              @sign="openConfirmModal"
-              @cancel="handleCancelContract"
-              @edit="openEditModal"
-              @delete="handleDelete"
-              @toggle-compare="toggleCompare"
-            />
+            >
+              <OptionCard
+                :option="dress"
+                :title="dress.name"
+                :subtitle="`${dress.brand} · ${dress.type}`"
+                :image="dress.image"
+                :tags="[dress.type, dress.style, dress.color]"
+                :meta-items="[
+                  { icon: DressPalette, label: '品牌', value: dress.brand },
+                  { icon: Ruler, label: '尺码', value: dress.size },
+                  { icon: Shirt, label: '颜色', value: dress.color },
+                  { icon: Calendar, label: '试纱', value: dress.fittingDate || '待定' }
+                ]"
+                :selected-for-compare="compareIds.includes(dress.id)"
+                :is-changing="!dress.contracted && hasContractedByType(dress.type)"
+                @sign="openConfirmModal"
+                @cancel="handleCancelContract"
+                @edit="openEditModal"
+                @delete="handleDelete"
+                @toggle-compare="toggleCompare"
+              />
+            </div>
           </div>
         </div>
 

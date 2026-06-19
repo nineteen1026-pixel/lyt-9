@@ -280,14 +280,34 @@ const totalBudget = computed(() => budgetStore.totalBudget)
 const totalSpent = computed(() => budgetStore.totalSpent)
 const remaining = computed(() => budgetStore.remaining)
 
+const categoryRoute = (category: string) => {
+  switch (category) {
+    case '场地': return '/venues'
+    case '摄影': return '/photography'
+    case '婚纱': return '/dress'
+    default: return null
+  }
+}
+
 const pieData = computed(() =>
   budgetStore.items.map(item => ({
     name: item.category,
     value: item.actual,
     color: item.color,
-    overBudget: item.actual > item.budget
+    overBudget: item.actual > item.budget,
+    drillable: !!categoryRoute(item.category)
   }))
 )
+
+const handleLegendClick = (name: string) => {
+  const route = categoryRoute(name)
+  if (route) {
+    router.push({
+      path: route,
+      query: { drill: '1', from: 'overview' }
+    })
+  }
+}
 
 interface TodoItem {
   id: string
@@ -694,7 +714,7 @@ const navigateTo = (path: string) => {
             </div>
           </div>
 
-          <PieChart :data="pieData" class="w-full h-48" />
+          <PieChart :data="pieData" class="w-full h-48" @legend-click="handleLegendClick" />
         </div>
 
         <div class="animate-slide-up bg-white rounded-2xl p-4 shadow-lg" style="animation-delay: 0.3s">

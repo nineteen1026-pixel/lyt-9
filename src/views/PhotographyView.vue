@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import { ref, computed } from 'vue'
-import { useRouter } from 'vue-router'
+import { ref, computed, onMounted, nextTick } from 'vue'
+import { useRouter, useRoute } from 'vue-router'
 import { usePhotographyStore, type Photography } from '@/stores/photography'
 import { useBudgetStore } from '@/stores/budget'
 import { Camera, Calendar, Palette, Plus, Filter, ArrowUpDown, SlidersHorizontal, ArrowLeftRight, Check } from 'lucide-vue-next'
@@ -11,8 +11,11 @@ import ConfirmSelectionModal from '@/components/ConfirmSelectionModal.vue'
 import Toast from '@/components/Toast.vue'
 
 const router = useRouter()
+const route = useRoute()
 const photographyStore = usePhotographyStore()
 const budgetStore = useBudgetStore()
+
+const drillMode = ref(false)
 
 const showFormModal = ref(false)
 const showCompareModal = ref(false)
@@ -207,6 +210,36 @@ const toggleSortDesc = () => {
   sortDesc.value = !sortDesc.value
 }
 
+onMounted(() => {
+  if (route.query.drill === '1') {
+    drillMode.value = true
+    filterStatus.value = 'contracted'
+    showFilter.value = true
+    const fromLabel = route.query.from === 'overview' ? '总览' : '预算'
+    const contractedList = photographyStore.items.filter(p => p.contracted)
+    if (contractedList.length > 0) {
+      showToast(
+        '已自动定位已确认方案',
+        `来自${fromLabel}页饼图下钻 · 共 ${contractedList.length} 项已确认方案`,
+        'success',
+        3000
+      )
+    } else {
+      showToast(
+        '暂无已确认方案',
+        `来自${fromLabel}页饼图下钻 · 请先确认选型`,
+        'info',
+        3000
+      )
+    }
+    nextTick(() => {
+      setTimeout(() => {
+        drillMode.value = false
+      }, 3500)
+    })
+  }
+})
+
 const getAvatarColor = (name: string) => {
   const colors = ['bg-primary-400', 'bg-champagne-300', 'bg-morandi-purple', 'bg-morandi-green']
   const index = name.charCodeAt(0) % colors.length
@@ -350,23 +383,30 @@ const getAvatarColor = (name: string) => {
             class="animate-slide-up"
             :style="{ animationDelay: `${0.15 + index * 0.08}s` }"
           >
-            <OptionCard
-              :option="item"
-              :title="item.teamName"
-              :subtitle="item.packageType"
-              :tags="[item.style, item.packageType]"
-              :meta-items="[
-                { icon: Palette, label: '风格', value: item.style },
-                { icon: Calendar, label: '日期', value: item.shootDate || '待定' }
+            <div
+              :class="[
+                'rounded-2xl transition-all duration-700',
+                drillMode && item.contracted ? 'ring-4 ring-green-400 ring-offset-2 ring-offset-transparent shadow-xl scale-[1.02] animate-pulse' : ''
               ]"
-              :selected-for-compare="compareIds.includes(item.id)"
-              :is-changing="!item.contracted && hasContractedItem"
-              @sign="openConfirmModal"
-              @cancel="handleCancelContract"
-              @edit="openEditModal"
-              @delete="handleDelete"
-              @toggle-compare="toggleCompare"
-            />
+            >
+              <OptionCard
+                :option="item"
+                :title="item.teamName"
+                :subtitle="item.packageType"
+                :tags="[item.style, item.packageType]"
+                :meta-items="[
+                  { icon: Palette, label: '风格', value: item.style },
+                  { icon: Calendar, label: '日期', value: item.shootDate || '待定' }
+                ]"
+                :selected-for-compare="compareIds.includes(item.id)"
+                :is-changing="!item.contracted && hasContractedItem"
+                @sign="openConfirmModal"
+                @cancel="handleCancelContract"
+                @edit="openEditModal"
+                @delete="handleDelete"
+                @toggle-compare="toggleCompare"
+              />
+            </div>
           </div>
         </div>
 
