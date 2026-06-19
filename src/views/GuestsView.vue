@@ -1,10 +1,10 @@
 <script setup lang="ts">
 import { ref, computed } from 'vue'
-import { useGuestsStore, type Guest, type GuestStatus, type GuestGroup, type ImportDedupeMode, type PerTableValidationResult } from '@/stores/guests'
+import { useGuestsStore, type Guest, type GuestStatus, type GuestGroup, type ImportDedupeMode, type PerTableValidationResult, type AdjustmentPlan } from '@/stores/guests'
 import {
   Search, Users, CheckCircle, Clock, XCircle, Utensils, Edit3, X, AlertTriangle, Info,
   Upload, Download, FileSpreadsheet, ChevronDown, ChevronUp, Layers, RefreshCw, SkipForward, Plus,
-  LayoutGrid, List, GripVertical, Settings2
+  LayoutGrid, List, GripVertical, Settings2, ArrowRightLeft, Sparkles, Shield, Shuffle, Play
 } from 'lucide-vue-next'
 import Toast from '@/components/Toast.vue'
 
@@ -29,6 +29,10 @@ const fileInputRef = ref<HTMLInputElement | null>(null)
 const pendingFile = ref<File | null>(null)
 const showDedupeModal = ref(false)
 const dedupeMode = ref<ImportDedupeMode>('skip')
+
+const showAdjustmentModal = ref(false)
+const selectedPlan = ref<AdjustmentPlan | null>(null)
+const applyingSteps = ref(false)
 
 const toastVisible = ref(false)
 const toastMessage = ref('')
@@ -339,6 +343,83 @@ const executeImport = async () => {
     pendingFile.value = null
   }
 }
+
+const capacityComp = computed(() => guestsStore.capacityComparison)
+
+const adjustmentPlans = computed(() => guestsStore.generateAdjustmentPlans())
+
+const capacityBarColor = computed(() => {
+  const s = capacityComp.value.status
+  if (s === 'danger') return 'bg-red-500'
+  if (s === 'warning') return 'bg-yellow-400'
+  return 'bg-primary-500'
+})
+
+const capacityStatusText = computed(() => {
+  const s = capacityComp.value.status
+  if (s === 'no-venue') return '未预订场地'
+  if (s === 'danger') return '超出容量'
+  if (s === 'warning') return '接近满员'
+  return '容量充裕'
+})
+
+const capacityStatusColor = computed(() => {
+  const s = capacityComp.value.status
+  if (s === 'no-venue') return 'text-yellow-500'
+  if (s === 'danger') return 'text-red-500'
+  if (s === 'warning') return 'text-yellow-500'
+  return 'text-green-500'
+})
+
+const openAdjustmentModal = () => {
+  selectedPlan.value = null
+  showAdjustmentModal.value = true
+}
+
+const closeAdjustmentModal = () => {
+  showAdjustmentModal.value = false
+  selectedPlan.value = null
+}
+
+const selectPlan = (plan: AdjustmentPlan) => {
+  selectedPlan.value = selectedPlan.value?.strategy === plan.strategy ? null : plan
+}
+
+const applyPlan = async () => {
+  if (!selectedPlan.value) return
+  applyingSteps.value = true
+  const steps = selectedPlan.value.steps.filter(s => s.type !== 'add-table')
+  for (const step of steps) {
+    guestsStore.applyAdjustmentStep(step)
+  }
+  applyingSteps.value = false
+  showAdjustmentModal.value = false
+  showToast(
+    '调整方案已执行',
+    `已按「${selectedPlan.value.strategyDescription}」完成调整，释放${selectedPlan.value.resolvedOverflow}个席位`,
+    'success',
+    4000
+  )
+  selectedPlan.value = null
+}
+
+const getStrategyIcon = (strategy: string) => {
+  switch (strategy) {
+    case 'unassign-pending': return Shield
+    case 'add-table': return Plus
+    case 'redistribute': return Shuffle
+    default: return Sparkles
+  }
+}
+
+const getStrategyLabel = (strategy: string) => {
+  switch (strategy) {
+    case 'unassign-pending': return '优先保障已确认'
+    case 'add-table': return '新增桌次'
+    case 'redistribute': return '重新分配'
+    default: return '智能调整'
+  }
+}
 </script>
 
 <template>
@@ -350,7 +431,7 @@ const executeImport = async () => {
       </div>
 
       <div class="px-4 -mt-10">
-        <div class="grid grid-cols-4 gap-3 mb-6">
+        <div class="grid grid-cols-4 gap-3 mb-4">
           <div class="animate-slide-up bg-white rounded-2xl p-3 shadow-md text-center" style="animation-delay: 0.1s">
             <p class="text-2xl font-bold text-primary-500">{{ guestsStore.totalCount }}</p>
             <p class="text-xs text-gray-500">总人数</p>
@@ -379,6 +460,76 @@ const executeImport = async () => {
           </div>
         </div>
 
+        <div v-if="guestsStore.hasBookedVenue" class="animate-slide-up bg-white rounded-2xl p-4 shadow-md mb-4" style="animation-delay: 0.32s">
+          <div class="flex items-center justify-between mb-3">
+            <div class="flex items-center gap-2">
+              <Sparkles class="w-5 h-5" :class="capacityStatusColor" />
+              <h3 class="font-bold text-gray-800 text-sm">场地容量实时比对</h3>
+            </div>
+            <span class="text-xs font-medium px-2.5 py-1 rounded-full"
+              :class="{
+                'bg-green-100 text-green-600': capacityComp.status === 'safe',
+                'bg-yellow-100 text-yellow-600': capacityComp.status === 'warning',
+                'bg-red-100 text-red-600': capacityComp.status === 'danger',
+                'bg-gray-100 text-gray-500': capacityComp.status === 'no-venue'
+              }"
+            >
+              {{ capacityStatusText }}
+            </span>
+          </div>
+
+          <div class="w-full bg-gray-200 rounded-full h-3 overflow-hidden mb-3">
+            <div
+              class="h-full rounded-full transition-all duration-500"
+              :class="capacityBarColor"
+              :style="{ width: `${Math.min(capacityComp.utilizationRate * 100, 100)}%` }"
+            ></div>
+          </div>
+
+          <div class="grid grid-cols-3 gap-3 mb-3">
+            <div class="text-center">
+              <p class="text-lg font-bold text-primary-500">{{ capacityComp.venueCapacity }}</p>
+              <p class="text-[10px] text-gray-400">场地席位</p>
+            </div>
+            <div class="text-center">
+              <p class="text-lg font-bold text-green-500">{{ capacityComp.confirmedAttendance }}</p>
+              <p class="text-[10px] text-gray-400">已确认出席</p>
+            </div>
+            <div class="text-center">
+              <p class="text-lg font-bold text-yellow-500">{{ capacityComp.pendingAttendance }}</p>
+              <p class="text-[10px] text-gray-400">待确认出席</p>
+            </div>
+          </div>
+
+          <div class="flex items-center justify-between text-xs text-gray-500 border-t border-gray-100 pt-2">
+            <span>已分配合计 <strong class="text-gray-700">{{ capacityComp.totalAssigned }}</strong> 人</span>
+            <span v-if="capacityComp.overflow > 0" class="text-red-500 font-medium">
+              超出 <strong>{{ capacityComp.overflow }}</strong> 人
+            </span>
+            <span v-else class="text-green-500 font-medium">
+              剩余 <strong>{{ capacityComp.venueCapacity - capacityComp.totalAssigned }}</strong> 席位
+            </span>
+          </div>
+
+          <button
+            v-if="capacityComp.overflow > 0"
+            @click="openAdjustmentModal"
+            class="mt-3 w-full py-2.5 bg-gradient-to-r from-red-400 to-red-500 text-white rounded-xl text-sm font-medium flex items-center justify-center gap-2 hover:shadow-lg transition-all duration-300"
+          >
+            <Sparkles class="w-4 h-4" />
+            智能分桌调整方案
+          </button>
+
+          <button
+            v-else-if="capacityComp.status === 'warning'"
+            @click="openAdjustmentModal"
+            class="mt-3 w-full py-2.5 bg-gradient-to-r from-yellow-400 to-yellow-500 text-white rounded-xl text-sm font-medium flex items-center justify-center gap-2 hover:shadow-lg transition-all duration-300"
+          >
+            <ArrowRightLeft class="w-4 h-4" />
+            查看优化建议
+          </button>
+        </div>
+
         <div v-if="showTableStats && guestsStore.tableStats.length > 0" class="animate-fade-in bg-white rounded-2xl p-4 shadow-md mb-4">
           <div class="flex items-center gap-2 mb-3">
             <Layers class="w-5 h-5 text-champagne-500" />
@@ -402,13 +553,12 @@ const executeImport = async () => {
           </div>
         </div>
 
-        <div v-if="guestsStore.capacityWarning" class="animate-slide-up mb-4 rounded-2xl p-4 shadow-sm" style="animation-delay: 0.35s"
-          :class="guestsStore.hasBookedVenue ? 'bg-red-50 border border-red-200' : 'bg-yellow-50 border border-yellow-200'">
+        <div v-if="guestsStore.capacityWarning && !guestsStore.hasBookedVenue" class="animate-slide-up mb-4 rounded-2xl p-4 shadow-sm bg-yellow-50 border border-yellow-200" style="animation-delay: 0.35s">
           <div class="flex items-start gap-3">
-            <component :is="guestsStore.hasBookedVenue ? AlertTriangle : Info" class="w-6 h-6 flex-shrink-0 mt-0.5" :class="guestsStore.hasBookedVenue ? 'text-red-500' : 'text-yellow-500'" />
+            <Info class="w-6 h-6 flex-shrink-0 mt-0.5 text-yellow-500" />
             <div>
-              <p class="font-medium" :class="guestsStore.hasBookedVenue ? 'text-red-700' : 'text-yellow-700'">{{ guestsStore.capacityWarning.title }}</p>
-              <p class="text-sm mt-1" :class="guestsStore.hasBookedVenue ? 'text-red-600' : 'text-yellow-600'">{{ guestsStore.capacityWarning.content }}</p>
+              <p class="font-medium text-yellow-700">{{ guestsStore.capacityWarning.title }}</p>
+              <p class="text-sm mt-1 text-yellow-600">{{ guestsStore.capacityWarning.content }}</p>
             </div>
           </div>
         </div>
@@ -942,6 +1092,143 @@ const executeImport = async () => {
               class="flex-1 py-3 bg-gradient-to-r from-primary-400 to-primary-500 text-white rounded-xl font-medium hover:shadow-lg transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:shadow-none"
             >
               {{ isImporting ? '导入中...' : '开始导入' }}
+            </button>
+          </div>
+        </div>
+      </div>
+    </Teleport>
+
+    <Teleport to="body">
+      <div v-if="showAdjustmentModal" class="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4">
+        <div class="absolute inset-0 bg-black/50 backdrop-blur-sm" @click="closeAdjustmentModal"></div>
+        <div class="relative bg-white rounded-t-3xl sm:rounded-3xl p-6 w-full max-w-lg max-h-[85vh] overflow-y-auto animate-fade-in shadow-2xl">
+          <button
+            @click="closeAdjustmentModal"
+            class="absolute top-4 right-4 w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center hover:bg-gray-200 transition-colors"
+          >
+            <X class="w-5 h-5 text-gray-500" />
+          </button>
+
+          <div class="text-center mb-5">
+            <div class="w-14 h-14 rounded-full flex items-center justify-center mx-auto mb-3"
+              :class="capacityComp.overflow > 0 ? 'bg-red-100' : 'bg-yellow-100'">
+              <Sparkles class="w-7 h-7" :class="capacityComp.overflow > 0 ? 'text-red-500' : 'text-yellow-500'" />
+            </div>
+            <h3 class="text-xl font-bold text-gray-800">智能分桌调整</h3>
+            <p class="text-sm text-gray-500 mt-1">
+              <template v-if="capacityComp.overflow > 0">
+                当前超出场地容量 <strong class="text-red-500">{{ capacityComp.overflow }}</strong> 人
+              </template>
+              <template v-else>
+                当前利用率 {{ Math.round(capacityComp.utilizationRate * 100) }}%，可优化分桌
+              </template>
+            </p>
+          </div>
+
+          <div class="bg-gray-50 rounded-xl p-3 mb-5">
+            <div class="flex items-center justify-between text-sm">
+              <span class="text-gray-500">场地席位</span>
+              <span class="font-bold text-primary-500">{{ capacityComp.venueCapacity }}人</span>
+            </div>
+            <div class="flex items-center justify-between text-sm mt-1">
+              <span class="text-gray-500">已确认出席</span>
+              <span class="font-bold text-green-500">{{ capacityComp.confirmedAttendance }}人</span>
+            </div>
+            <div class="flex items-center justify-between text-sm mt-1">
+              <span class="text-gray-500">待确认出席</span>
+              <span class="font-bold text-yellow-500">{{ capacityComp.pendingAttendance }}人</span>
+            </div>
+            <div class="flex items-center justify-between text-sm mt-1 pt-2 border-t border-gray-200">
+              <span class="text-gray-600 font-medium">已分配合计</span>
+              <span class="font-bold" :class="capacityComp.overflow > 0 ? 'text-red-500' : 'text-gray-800'">
+                {{ capacityComp.totalAssigned }}人
+              </span>
+            </div>
+          </div>
+
+          <div v-if="adjustmentPlans.length > 0" class="space-y-3 mb-5">
+            <h4 class="text-sm font-bold text-gray-700">选择调整方案</h4>
+            <button
+              v-for="plan in adjustmentPlans"
+              :key="plan.strategy"
+              @click="selectPlan(plan)"
+              class="w-full text-left p-4 rounded-2xl border-2 transition-all"
+              :class="selectedPlan?.strategy === plan.strategy
+                ? 'border-primary-400 bg-primary-50 shadow-sm'
+                : 'border-gray-100 bg-white hover:border-gray-200'"
+            >
+              <div class="flex items-start gap-3">
+                <div
+                  class="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0"
+                  :class="selectedPlan?.strategy === plan.strategy ? 'bg-primary-500 text-white' : 'bg-gray-100 text-gray-500'"
+                >
+                  <component :is="getStrategyIcon(plan.strategy)" class="w-5 h-5" />
+                </div>
+                <div class="flex-1">
+                  <div class="flex items-center justify-between">
+                    <p class="font-semibold" :class="selectedPlan?.strategy === plan.strategy ? 'text-primary-600' : 'text-gray-800'">
+                      {{ getStrategyLabel(plan.strategy) }}
+                    </p>
+                    <div
+                      class="w-5 h-5 rounded-full border-2 flex items-center justify-center"
+                      :class="selectedPlan?.strategy === plan.strategy ? 'border-primary-500' : 'border-gray-300'"
+                    >
+                      <div v-if="selectedPlan?.strategy === plan.strategy" class="w-2.5 h-2.5 rounded-full bg-primary-500"></div>
+                    </div>
+                  </div>
+                  <p class="text-xs text-gray-500 mt-1">{{ plan.strategyDescription }}</p>
+                  <div class="flex items-center gap-3 mt-2 text-[10px]">
+                    <span class="px-2 py-0.5 rounded-full bg-green-100 text-green-600">
+                      释放{{ plan.resolvedOverflow }}席位
+                    </span>
+                    <span v-if="plan.remainingOverflow > 0" class="px-2 py-0.5 rounded-full bg-red-100 text-red-600">
+                      仍超{{ plan.remainingOverflow }}人
+                    </span>
+                    <span v-else class="px-2 py-0.5 rounded-full bg-blue-100 text-blue-600">
+                      完全解决
+                    </span>
+                  </div>
+                </div>
+              </div>
+            </button>
+          </div>
+
+          <div v-if="adjustmentPlans.length === 0" class="text-center py-8 mb-5">
+            <CheckCircle class="w-12 h-12 text-green-400 mx-auto mb-3" />
+            <p class="text-gray-500 text-sm">当前无需调整，容量状态良好</p>
+          </div>
+
+          <div v-if="selectedPlan" class="mb-5">
+            <h4 class="text-sm font-bold text-gray-700 mb-2">调整步骤</h4>
+            <div class="space-y-2 max-h-48 overflow-y-auto">
+              <div
+                v-for="(step, i) in selectedPlan.steps"
+                :key="i"
+                class="flex items-start gap-2.5 p-2.5 rounded-xl bg-gray-50 text-sm"
+              >
+                <span class="w-5 h-5 rounded-full bg-primary-100 text-primary-500 flex items-center justify-center text-xs font-bold flex-shrink-0 mt-0.5">
+                  {{ i + 1 }}
+                </span>
+                <p class="text-gray-600 text-xs leading-relaxed">{{ step.description }}</p>
+              </div>
+            </div>
+          </div>
+
+          <div class="flex gap-3">
+            <button
+              @click="closeAdjustmentModal"
+              class="flex-1 py-3 border-2 border-gray-200 text-gray-600 rounded-xl font-medium hover:bg-gray-50 transition-colors"
+            >
+              取消
+            </button>
+            <button
+              v-if="selectedPlan"
+              @click="applyPlan"
+              :disabled="applyingSteps"
+              class="flex-1 py-3 bg-gradient-to-r from-primary-400 to-primary-500 text-white rounded-xl font-medium hover:shadow-lg transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+            >
+              <Play class="w-4 h-4" />
+              {{ applyingSteps ? '执行中...' : '执行方案' }}
             </button>
           </div>
         </div>
