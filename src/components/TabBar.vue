@@ -33,7 +33,10 @@
 </template>
 
 <script setup lang="ts">
+import { computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
+import { useRoleStore } from '@/stores/role'
+import { isModuleVisible } from '@/data/permissions'
 import {
   LayoutDashboard,
   PieChart,
@@ -47,17 +50,22 @@ import {
 
 const route = useRoute()
 const router = useRouter()
+const roleStore = useRoleStore()
 
-const tabs = [
-  { path: '/overview', label: '总览', icon: LayoutDashboard },
-  { path: '/budget', label: '预算', icon: PieChart },
-  { path: '/guests', label: '宾客', icon: Users },
-  { path: '/venues', label: '场地', icon: Building2 },
-  { path: '/photography', label: '摄影', icon: Camera },
-  { path: '/dress', label: '婚纱', icon: Shirt },
-  { path: '/schedule', label: '流程', icon: Calendar },
-  { path: '/rehearsal', label: '彩排', icon: ListChecks }
+const allTabs = [
+  { path: '/overview', label: '总览', icon: LayoutDashboard, id: 'overview' },
+  { path: '/budget', label: '预算', icon: PieChart, id: 'budget' },
+  { path: '/guests', label: '宾客', icon: Users, id: 'guests' },
+  { path: '/venues', label: '场地', icon: Building2, id: 'venues' },
+  { path: '/photography', label: '摄影', icon: Camera, id: 'photography' },
+  { path: '/dress', label: '婚纱', icon: Shirt, id: 'dress' },
+  { path: '/schedule', label: '流程', icon: Calendar, id: 'schedule' },
+  { path: '/rehearsal', label: '彩排', icon: ListChecks, id: 'rehearsal' }
 ]
+
+const tabs = computed(() => 
+  allTabs.filter(tab => isModuleVisible(tab.id, roleStore.currentRole))
+)
 
 const isActive = (path: string) => route.path === path
 

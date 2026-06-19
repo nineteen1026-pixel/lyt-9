@@ -2,10 +2,13 @@
 import { ref, computed } from 'vue'
 import { useRehearsalStore } from '@/stores/rehearsal'
 import { useScheduleStore } from '@/stores/schedule'
+import { useRoleStore } from '@/stores/role'
+import RoleSwitcher from '@/components/RoleSwitcher.vue'
 import { Calendar, Clock, MapPin, Phone, Users, ChevronDown, ChevronUp, AlertCircle, Edit2, Check, X, Plus, Trash2, Link2 } from 'lucide-vue-next'
 import type { StaffMember, RehearsalStep } from '@/data/mockData'
 import { storeToRefs } from 'pinia'
 
+const roleStore = useRoleStore()
 const rehearsalStore = useRehearsalStore()
 const scheduleStore = useScheduleStore()
 const { staff } = storeToRefs(rehearsalStore)
@@ -150,8 +153,14 @@ const saveEditStepLink = () => {
   <div class="min-h-screen bg-gradient-to-br from-primary-50 via-ivory to-champagne-100 pb-20">
     <div class="animate-fade-in">
       <div class="bg-gradient-to-r from-primary-400 to-primary-500 px-6 pt-12 pb-16 rounded-b-3xl shadow-lg">
-        <h1 class="text-3xl font-serif font-bold text-white text-center">婚礼彩排</h1>
-        <p class="text-primary-100 text-center mt-2">预演完美，确保顺利</p>
+        <div class="flex items-center justify-between mb-2">
+          <div class="w-24"></div>
+          <div class="text-center">
+            <h1 class="text-3xl font-serif font-bold text-white">婚礼彩排</h1>
+            <p class="text-primary-100 mt-2">预演完美，确保顺利</p>
+          </div>
+          <RoleSwitcher />
+        </div>
       </div>
 
       <div class="px-4 -mt-10">

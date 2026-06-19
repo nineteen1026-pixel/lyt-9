@@ -2,12 +2,15 @@
 import { computed } from 'vue'
 import { useScheduleStore } from '@/stores/schedule'
 import { useRehearsalStore } from '@/stores/rehearsal'
+import { useRoleStore } from '@/stores/role'
 import Timeline from '@/components/Timeline.vue'
 import { Calendar } from 'lucide-vue-next'
+import RoleSwitcher from '@/components/RoleSwitcher.vue'
 import { storeToRefs } from 'pinia'
 
 const scheduleStore = useScheduleStore()
 const rehearsalStore = useRehearsalStore()
+const roleStore = useRoleStore()
 const { weddingDate, items } = storeToRefs(scheduleStore)
 const { staff } = storeToRefs(rehearsalStore)
 
@@ -69,8 +72,14 @@ const handlePersonInChargeUpdate = (id: string, personId: string | undefined, pe
   <div class="min-h-screen bg-gradient-to-br from-primary-50 via-ivory to-champagne-100 pb-20">
     <div class="animate-fade-in">
       <div class="bg-gradient-to-r from-primary-400 to-primary-500 px-6 pt-12 pb-16 rounded-b-3xl shadow-lg">
-        <h1 class="text-3xl font-serif font-bold text-white text-center">婚礼流程</h1>
-        <p class="text-primary-100 text-center mt-2">精心安排，圆满时刻</p>
+        <div class="flex items-center justify-between mb-4">
+          <div class="w-28"></div>
+          <div class="text-center">
+            <h1 class="text-3xl font-serif font-bold text-white">婚礼流程</h1>
+            <p class="text-primary-100 mt-2">精心安排，圆满时刻</p>
+          </div>
+          <RoleSwitcher />
+        </div>
       </div>
 
       <div class="px-4 -mt-10">

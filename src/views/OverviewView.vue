@@ -9,7 +9,10 @@ import { useDressStore } from '@/stores/dress'
 import { useScheduleStore } from '@/stores/schedule'
 import { useRehearsalStore } from '@/stores/rehearsal'
 import { useChecklistStore } from '@/stores/checklist'
+import { useRoleStore } from '@/stores/role'
 import PieChart from '@/components/PieChart.vue'
+import RoleSwitcher from '@/components/RoleSwitcher.vue'
+import { isModuleVisible, isBudgetVisible } from '@/data/permissions'
 import {
   LayoutDashboard,
   Wallet,
@@ -30,6 +33,8 @@ import {
   Bell,
   Gift
 } from 'lucide-vue-next'
+
+const roleStore = useRoleStore()
 
 const router = useRouter()
 const budgetStore = useBudgetStore()
@@ -93,21 +98,43 @@ const formatDate = (date: Date) => {
 
 const expectedBudgetCategories = ['场地', '餐饮', '婚纱', '摄影', '化妆', '礼仪', '其他']
 
+const visibleBudgetCategories = computed(() => 
+  expectedBudgetCategories.filter(cat => isBudgetVisible(cat, roleStore.currentRole))
+)
+
 const budgetCompletionProgress = computed(() => {
-  const plannedCount = expectedBudgetCategories.filter(cat =>
+  const plannedCount = visibleBudgetCategories.value.filter(cat =>
     budgetStore.items.some(item => item.category === cat && item.budget > 0)
   ).length
-  return (plannedCount / expectedBudgetCategories.length) * 100
+  return visibleBudgetCategories.value.length > 0 ? (plannedCount / visibleBudgetCategories.value.length) * 100 : 0
 })
 
-const budgetExecutionRate = computed(() => budgetStore.progress)
+const budgetExecutionRate = computed(() => 
+  totalBudget.value > 0 ? (totalSpent.value / totalBudget.value) * 100 : 0
+)
 
 const hasOverBudget = computed(() =>
-  budgetStore.items.some(item => item.actual > item.budget)
+  visibleBudgetItems.value.some(item => item.actual > item.budget)
 )
 
 const overBudgetItems = computed(() =>
-  budgetStore.items.filter(item => item.actual > item.budget)
+  visibleBudgetItems.value.filter(item => item.actual > item.budget)
+)
+
+const confirmedBudgetForView = computed(() =>
+  visibleBudgetItems.value.filter(item => item.confirmed).reduce((sum, item) => sum + (item.budget ?? item.planned), 0)
+)
+
+const confirmedBudgetCountForView = computed(() =>
+  visibleBudgetItems.value.filter(item => item.confirmed).length
+)
+
+const confirmationProgressForView = computed(() =>
+  visibleBudgetItems.value.length > 0 ? (confirmedBudgetCountForView.value / visibleBudgetItems.value.length) * 100 : 0
+)
+
+const executionProgressForView = computed(() =>
+  totalBudget.value > 0 ? (confirmedBudgetForView.value / totalBudget.value) * 100 : 0
 )
 
 const guestsProgress = computed(() => {
@@ -269,16 +296,24 @@ const modulesProgress = computed<ModuleProgress[]>(() => [
     color: 'text-orange-500',
     bgColor: 'bg-orange-100'
   }
-])
+].filter(m => isModuleVisible(m.id, roleStore.currentRole)))
 
 const overallProgress = computed(() => {
   const total = modulesProgress.value.reduce((sum, m) => sum + m.progress, 0)
   return total / modulesProgress.value.length
 })
 
-const totalBudget = computed(() => budgetStore.totalBudget)
-const totalSpent = computed(() => budgetStore.totalSpent)
-const remaining = computed(() => budgetStore.remaining)
+const visibleBudgetItems = computed(() => 
+  budgetStore.items.filter(item => isBudgetVisible(item.category, roleStore.currentRole))
+)
+
+const totalBudget = computed(() => 
+  visibleBudgetItems.value.reduce((sum, item) => sum + (item.budget ?? item.planned), 0)
+)
+const totalSpent = computed(() => 
+  visibleBudgetItems.value.reduce((sum, item) => sum + item.actual, 0)
+)
+const remaining = computed(() => totalBudget.value - totalSpent.value)
 
 const categoryRoute = (category: string) => {
   switch (category) {
@@ -290,7 +325,7 @@ const categoryRoute = (category: string) => {
 }
 
 const pieData = computed(() =>
-  budgetStore.items.map(item => ({
+  visibleBudgetItems.value.map(item => ({
     name: item.category,
     value: item.actual,
     color: item.color,
@@ -587,9 +622,7 @@ const navigateTo = (path: string) => {
             <h1 class="text-3xl font-serif font-bold text-white">筹备总览</h1>
             <p class="text-primary-100 mt-1">婚礼筹备进度一目了然</p>
           </div>
-          <div class="w-12 h-12 rounded-full bg-white/20 backdrop-blur-sm flex items-center justify-center">
-            <LayoutDashboard class="w-6 h-6 text-white" />
-          </div>
+          <RoleSwitcher />
         </div>
 
         <div class="bg-white/10 backdrop-blur-sm rounded-2xl p-4 border border-white/20">
@@ -618,9 +651,9 @@ const navigateTo = (path: string) => {
           <div class="flex items-center justify-between mb-4">
             <h2 class="text-lg font-bold text-gray-800 flex items-center gap-2">
               <Target class="w-5 h-5 text-primary-500" />
-              七模块完成度
+              {{ roleStore.roleLabel }}筹备模块
             </h2>
-            <span class="text-sm text-gray-500">{{ modulesProgress.filter(m => m.progress >= 100).length }}/7 已完成</span>
+            <span class="text-sm text-gray-500">{{ modulesProgress.filter(m => m.progress >= 100).length }}/{{ modulesProgress.length }} 已完成</span>
           </div>
           <div class="grid grid-cols-4 gap-3">
             <div
@@ -670,9 +703,9 @@ const navigateTo = (path: string) => {
               <Wallet class="w-5 h-5 text-primary-500" />
               预算执行进度
             </h2>
-            <div class="flex items-center gap-1" :class="getProgressColor(budgetStore.executionProgress)">
+            <div class="flex items-center gap-1" :class="getProgressColor(executionProgressForView)">
               <CheckCircle2 class="w-4 h-4" />
-              <span class="text-sm font-bold">{{ budgetStore.executionProgress.toFixed(1) }}%</span>
+              <span class="text-sm font-bold">{{ executionProgressForView.toFixed(1) }}%</span>
             </div>
           </div>
 
@@ -683,19 +716,19 @@ const navigateTo = (path: string) => {
             </div>
             <div class="text-center p-3 bg-green-50 rounded-xl">
               <p class="text-xs text-gray-500 mb-1">已确认支出</p>
-              <p class="text-sm font-bold text-green-600">{{ formatCurrency(budgetStore.confirmedBudget) }}</p>
+              <p class="text-sm font-bold text-green-600">{{ formatCurrency(confirmedBudgetForView) }}</p>
             </div>
           </div>
 
           <div class="mb-4">
             <div class="flex items-center justify-between mb-2">
               <span class="text-xs text-gray-500">分类确认进度</span>
-              <span class="text-xs font-medium text-gray-700">{{ budgetStore.confirmedCount }}/{{ budgetStore.items.length }} 项</span>
+              <span class="text-xs font-medium text-gray-700">{{ confirmedBudgetCountForView }}/{{ visibleBudgetItems.length }} 项</span>
             </div>
             <div class="w-full bg-gray-100 rounded-full h-2.5 overflow-hidden">
               <div
                 class="h-full bg-gradient-to-r from-green-400 to-green-500 rounded-full transition-all duration-1000"
-                :style="{ width: `${budgetStore.confirmationProgress}%` }"
+                :style="{ width: `${confirmationProgressForView}%` }"
               ></div>
             </div>
           </div>
@@ -703,13 +736,13 @@ const navigateTo = (path: string) => {
           <div class="mb-4">
             <div class="flex items-center justify-between mb-2">
               <span class="text-xs text-gray-500">金额执行进度</span>
-              <span class="text-xs font-medium text-gray-700">{{ budgetStore.executionProgress.toFixed(1) }}%</span>
+              <span class="text-xs font-medium text-gray-700">{{ executionProgressForView.toFixed(1) }}%</span>
             </div>
             <div class="w-full bg-gray-100 rounded-full h-2.5 overflow-hidden">
               <div
                 class="h-full rounded-full transition-all duration-1000"
-                :class="budgetStore.executionProgress > 100 ? 'bg-gradient-to-r from-red-400 to-red-500' : 'bg-gradient-to-r from-primary-400 to-primary-500'"
-                :style="{ width: `${Math.min(budgetStore.executionProgress, 100)}%` }"
+                :class="executionProgressForView > 100 ? 'bg-gradient-to-r from-red-400 to-red-500' : 'bg-gradient-to-r from-primary-400 to-primary-500'"
+                :style="{ width: `${Math.min(executionProgressForView, 100)}%` }"
               ></div>
             </div>
           </div>

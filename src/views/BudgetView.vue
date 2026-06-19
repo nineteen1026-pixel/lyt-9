@@ -6,18 +6,26 @@ import { useGuestsStore } from '@/stores/guests'
 import { useVenuesStore } from '@/stores/venues'
 import { usePhotographyStore } from '@/stores/photography'
 import { useDressStore } from '@/stores/dress'
+import { useRoleStore } from '@/stores/role'
 import PieChart from '@/components/PieChart.vue'
 import Toast from '@/components/Toast.vue'
-import { Wallet, TrendingDown, TrendingUp, Target, AlertTriangle, Info, Lock, MapPin, Camera, Shirt, ExternalLink, CheckCircle, CheckCircle2, Check, RefreshCw, ChevronDown, ChevronUp } from 'lucide-vue-next'
+import RoleSwitcher from '@/components/RoleSwitcher.vue'
+import { Wallet, TrendingDown, TrendingUp, Target, AlertTriangle, Info, Lock, MapPin, Camera, Shirt, ExternalLink, CheckCircle, CheckCircle2, Check, RefreshCw, ChevronDown, ChevronUp, Users, Heart } from 'lucide-vue-next'
 import { useChecklistStore } from '@/stores/checklist'
+import { isBudgetVisible, getBudgetOwner } from '@/data/permissions'
 
 const router = useRouter()
+const roleStore = useRoleStore()
 const budgetStore = useBudgetStore()
 const guestsStore = useGuestsStore()
 const venuesStore = useVenuesStore()
 const photographyStore = usePhotographyStore()
 const dressStore = useDressStore()
 const checklistStore = useChecklistStore()
+
+const visibleItems = computed(() => 
+  budgetStore.items.filter(item => isBudgetVisible(item.category, roleStore.currentRole))
+)
 
 const expandedCategory = ref<string | null>(null)
 
@@ -52,8 +60,8 @@ const formatCurrency = (value: number) => {
   return `¥${value.toLocaleString()}`
 }
 
-const totalBudget = computed(() => budgetStore.items.reduce((sum, item) => sum + item.budget, 0))
-const totalSpent = computed(() => budgetStore.items.reduce((sum, item) => sum + item.actual, 0))
+const totalBudget = computed(() => visibleItems.value.reduce((sum, item) => sum + item.budget, 0))
+const totalSpent = computed(() => visibleItems.value.reduce((sum, item) => sum + item.actual, 0))
 const remaining = computed(() => totalBudget.value - totalSpent.value)
 const progress = computed(() => Math.min((totalSpent.value / totalBudget.value) * 100, 100))
 
@@ -62,7 +70,7 @@ const isOverBudget = (budget: number, actual: number) => {
 }
 
 const pieData = computed(() =>
-  budgetStore.items.map(item => ({
+  visibleItems.value.map(item => ({
     name: item.category,
     value: item.actual,
     color: item.color,
@@ -161,6 +169,26 @@ const goToCategory = (category: string) => {
 const handleLegendClick = (name: string) => {
   goToCategory(name)
 }
+
+const getOwnerLabel = (category: string) => {
+  const owner = getBudgetOwner(category)
+  switch (owner) {
+    case 'groom': return '男方'
+    case 'bride': return '女方'
+    case 'both': return '双方共同'
+    default: return '双方共同'
+  }
+}
+
+const getOwnerClass = (category: string) => {
+  const owner = getBudgetOwner(category)
+  switch (owner) {
+    case 'groom': return 'bg-blue-100 text-blue-600'
+    case 'bride': return 'bg-pink-100 text-pink-600'
+    case 'both': return 'bg-primary-100 text-primary-600'
+    default: return 'bg-gray-100 text-gray-600'
+  }
+}
 </script>
 
 <template>
@@ -172,10 +200,16 @@ const handleLegendClick = (name: string) => {
           <div class="absolute -bottom-10 -left-10 w-48 h-48 rounded-full bg-white"></div>
         </div>
         <div class="relative z-10">
-          <h1 class="text-3xl font-serif font-bold text-white text-center">婚礼预算</h1>
-          <p class="text-primary-100 text-center mt-2">精心规划，幸福启航</p>
+          <div class="flex items-center justify-between mb-4">
+            <div class="w-28"></div>
+            <div class="text-center">
+              <h1 class="text-3xl font-serif font-bold text-white">婚礼预算</h1>
+              <p class="text-primary-100 mt-2">精心规划，幸福启航</p>
+            </div>
+            <RoleSwitcher />
+          </div>
 
-          <div class="flex items-center justify-center mt-4">
+          <div class="flex items-center justify-center">
             <button
               @click="handleSync"
               class="py-2 px-4 bg-white/20 backdrop-blur-sm text-white rounded-xl text-sm font-medium flex items-center gap-1.5 hover:bg-white/30 transition-colors"
@@ -270,10 +304,13 @@ const handleLegendClick = (name: string) => {
         </div>
 
         <div class="animate-slide-up" style="animation-delay: 0.7s">
-          <h2 class="text-lg font-bold text-gray-800 mb-4">支出明细</h2>
+          <div class="flex items-center justify-between mb-4">
+            <h2 class="text-lg font-bold text-gray-800">支出明细</h2>
+            <span class="text-xs text-gray-400">显示 {{ visibleItems.length }} 项 {{ roleStore.roleLabel }}相关支出</span>
+          </div>
           <div class="space-y-3">
             <div
-              v-for="(item, index) in budgetStore.items"
+              v-for="(item, index) in visibleItems"
               :key="item.id"
               class="bg-white rounded-xl shadow-sm hover:shadow-md transition-all duration-300 overflow-hidden"
               :class="{
@@ -308,10 +345,14 @@ const handleLegendClick = (name: string) => {
                       </div>
                     </div>
                     <div>
-                      <div class="flex items-center gap-1.5">
+                      <div class="flex items-center gap-1.5 flex-wrap">
                         <p class="font-medium" :class="isOverBudget(item.budget, item.actual) ? 'text-red-600' : 'text-gray-800'">{{ item.category }}</p>
                         <span v-if="item.locked" class="text-xs text-primary-500 bg-primary-100 px-1.5 py-0.5 rounded-full">已锁定</span>
                         <span v-else-if="item.confirmed" class="text-xs text-green-600 bg-green-100 px-1.5 py-0.5 rounded-full">支出已确认</span>
+                        <span :class="getOwnerClass(item.category)" class="text-xs px-1.5 py-0.5 rounded-full flex items-center gap-0.5">
+                          <Heart class="w-3 h-3" />
+                          {{ getOwnerLabel(item.category) }}
+                        </span>
                       </div>
                       <p class="text-xs" :class="isOverBudget(item.budget, item.actual) ? 'text-red-400' : 'text-gray-400'">预算: {{ formatCurrency(item.budget) }}</p>
                     </div>

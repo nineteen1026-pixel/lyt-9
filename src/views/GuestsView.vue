@@ -1,6 +1,8 @@
 <script setup lang="ts">
-import { ref, computed } from 'vue'
+import { ref, computed, watch } from 'vue'
 import { useGuestsStore, type Guest, type GuestStatus, type GuestGroup, type ImportDedupeMode, type PerTableValidationResult, type AdjustmentPlan } from '@/stores/guests'
+import { useRoleStore } from '@/stores/role'
+import RoleSwitcher from '@/components/RoleSwitcher.vue'
 import {
   Search, Users, CheckCircle, Clock, XCircle, Utensils, Edit3, X, AlertTriangle, Info,
   Upload, Download, FileSpreadsheet, ChevronDown, ChevronUp, Layers, RefreshCw, SkipForward, Plus,
@@ -8,11 +10,16 @@ import {
 } from 'lucide-vue-next'
 import Toast from '@/components/Toast.vue'
 
+const roleStore = useRoleStore()
 const guestsStore = useGuestsStore()
 const searchQuery = ref('')
 const activeFilter = ref<GuestStatus | 'all'>('all')
-const activeGroup = ref<GuestGroup | 'all'>('all')
+const activeGroup = ref<GuestGroup | 'all'>(roleStore.currentRole)
 const viewMode = ref<'list' | 'table'>('list')
+
+watch(() => roleStore.currentRole, (newRole) => {
+  activeGroup.value = newRole
+})
 
 const draggedGuestId = ref<string | null>(null)
 const dragOverGuestId = ref<string | null>(null)
@@ -426,8 +433,14 @@ const getStrategyLabel = (strategy: string) => {
   <div class="min-h-screen bg-gradient-to-br from-primary-50 via-ivory to-champagne-100 pb-20">
     <div class="animate-fade-in">
       <div class="bg-gradient-to-r from-primary-400 to-primary-500 px-6 pt-12 pb-16 rounded-b-3xl shadow-lg">
-        <h1 class="text-3xl font-serif font-bold text-white text-center">宾客名单</h1>
-        <p class="text-primary-100 text-center mt-2">共邀挚爱，见证幸福</p>
+        <div class="flex items-center justify-between mb-2">
+          <div class="w-24"></div>
+          <div class="text-center">
+            <h1 class="text-3xl font-serif font-bold text-white">宾客名单</h1>
+            <p class="text-primary-100 mt-2">共邀挚爱，见证幸福</p>
+          </div>
+          <RoleSwitcher />
+        </div>
       </div>
 
       <div class="px-4 -mt-10">

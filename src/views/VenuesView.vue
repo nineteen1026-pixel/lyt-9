@@ -3,17 +3,20 @@ import { ref, computed, onMounted, onBeforeUnmount, watch, nextTick } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { useVenuesStore, type Venue } from '@/stores/venues'
 import { useBudgetStore } from '@/stores/budget'
+import { useRoleStore } from '@/stores/role'
 import { MapPin, Users, Tag, Plus, Filter, ArrowUpDown, SlidersHorizontal, ArrowLeftRight, X } from 'lucide-vue-next'
 import OptionCard from '@/components/OptionCard.vue'
 import OptionFormModal from '@/components/OptionFormModal.vue'
 import CompareModal from '@/components/CompareModal.vue'
 import ConfirmSelectionModal from '@/components/ConfirmSelectionModal.vue'
 import Toast from '@/components/Toast.vue'
+import RoleSwitcher from '@/components/RoleSwitcher.vue'
 
 const router = useRouter()
 const route = useRoute()
 const venuesStore = useVenuesStore()
 const budgetStore = useBudgetStore()
+const roleStore = useRoleStore()
 
 const drillMode = ref(false)
 const contractedListRef = ref<HTMLElement | null>(null)
@@ -274,8 +277,14 @@ watch(
           <div class="absolute -bottom-10 -left-10 w-48 h-48 rounded-full bg-white"></div>
         </div>
         <div class="relative z-10">
-          <h1 class="text-3xl font-serif font-bold text-white text-center">婚礼场地</h1>
-          <p class="text-primary-100 text-center mt-2">多方案甄选，定格完美场地</p>
+          <div class="flex items-center justify-between mb-4">
+            <div class="w-28"></div>
+            <div class="text-center">
+              <h1 class="text-3xl font-serif font-bold text-white">婚礼场地</h1>
+              <p class="text-primary-100 mt-2">多方案甄选，定格完美场地</p>
+            </div>
+            <RoleSwitcher />
+          </div>
 
           <div class="grid grid-cols-3 gap-3 mt-6">
             <div class="bg-white/15 backdrop-blur-sm rounded-2xl p-3 text-center">
