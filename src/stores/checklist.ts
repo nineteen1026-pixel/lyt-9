@@ -33,10 +33,11 @@ export const useChecklistStore = defineStore('checklist', () => {
     })
 
     categoriesWithTasks.forEach((completedList, category) => {
-      const allCompleted = completedList.every(c => c)
-      if (allCompleted) {
+      const anyCompleted = completedList.some(c => c)
+      const noneCompleted = completedList.every(c => !c)
+      if (anyCompleted) {
         budgetStore.confirmCategory(category)
-      } else {
+      } else if (noneCompleted) {
         budgetStore.unconfirmCategory(category)
       }
     })
