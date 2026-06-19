@@ -48,12 +48,58 @@
               </svg>
               {{ item.time }}
             </span>
-            <span v-if="item.personInCharge" class="text-xs text-gray-400 flex items-center gap-1">
-              <svg class="w-3.5 h-3.5 text-primary-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-              </svg>
-              {{ item.personInCharge }}
-            </span>
+            <template v-if="editable && editingId === item.id">
+              <div class="flex items-center gap-2">
+                <select
+                  v-model="editingPersonId"
+                  class="px-2 py-1 text-xs border border-primary-200 rounded-lg outline-none focus:ring-2 focus:ring-primary-300 bg-white"
+                  @change="handlePersonChange"
+                >
+                  <option value="">请选择负责人</option>
+                  <option v-for="opt in staffOptions" :key="opt.id" :value="opt.id">
+                    {{ opt.name }}（{{ opt.role }}）
+                  </option>
+                </select>
+                <button @click="cancelEdit" class="p-1 text-gray-400 hover:text-red-500 rounded">
+                  <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
+            </template>
+            <template v-else-if="editable && item.personInCharge">
+              <button
+                @click="startEdit(item)"
+                class="text-xs text-gray-400 flex items-center gap-1 hover:text-primary-500 transition-colors"
+              >
+                <svg class="w-3.5 h-3.5 text-primary-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                </svg>
+                {{ item.personInCharge }}
+                <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                </svg>
+              </button>
+            </template>
+            <template v-else-if="editable">
+              <button
+                @click="startEdit(item)"
+                class="text-xs text-gray-300 flex items-center gap-1 hover:text-primary-400 transition-colors"
+              >
+                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
+                </svg>
+                添加负责人
+              </button>
+            </template>
+            <template v-else-if="item.personInCharge">
+              <span class="text-xs text-gray-400 flex items-center gap-1">
+                <svg class="w-3.5 h-3.5 text-primary-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                </svg>
+                {{ item.personInCharge }}
+              </span>
+            </template>
           </div>
           <h3 class="text-lg font-bold text-gray-800 mb-2">{{ item.title }}</h3>
           <p class="text-sm text-gray-600 mb-3 leading-relaxed">{{ item.description }}</p>
@@ -76,16 +122,29 @@ import { ref, onMounted, onUnmounted, nextTick } from 'vue'
 type SeparatorItem = { type: 'separator'; label: string }
 type EventItem = {
   type: 'event'
+  id?: string
   time: string
   title: string
   description: string
   location?: string
   personInCharge?: string
+  personInChargeId?: string
 }
 type TimelineItem = SeparatorItem | EventItem
 
-const props = defineProps<{
+type StaffOption = { id: string; name: string; role: string }
+
+const props = withDefaults(defineProps<{
   items: TimelineItem[]
+  editable?: boolean
+  staffOptions?: StaffOption[]
+}>(), {
+  editable: false,
+  staffOptions: () => []
+})
+
+const emit = defineEmits<{
+  'update:personInCharge': [id: string, personId: string | undefined, personName: string]
 }>()
 
 function isSeparator(item: TimelineItem): item is SeparatorItem {
@@ -103,8 +162,28 @@ function isFirstEvent(index: number): boolean {
 
 const itemRefs = ref<(HTMLElement | null)[]>([])
 const visibleItems = ref<boolean[]>([])
+const editingId = ref<string | undefined>(undefined)
+const editingPersonId = ref<string>('')
 
 let observer: IntersectionObserver | null = null
+
+const startEdit = (item: EventItem) => {
+  if (!item.id) return
+  editingId.value = item.id
+  editingPersonId.value = item.personInChargeId || ''
+}
+
+const cancelEdit = () => {
+  editingId.value = undefined
+  editingPersonId.value = ''
+}
+
+const handlePersonChange = () => {
+  if (!editingId.value) return
+  const selected = props.staffOptions.find(opt => opt.id === editingPersonId.value)
+  emit('update:personInCharge', editingId.value, selected?.id, selected?.name || '')
+  cancelEdit()
+}
 
 const initObserver = () => {
   observer = new IntersectionObserver(

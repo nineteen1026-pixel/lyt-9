@@ -1,10 +1,12 @@
 <script setup lang="ts">
-import { ref } from 'vue'
+import { ref, computed } from 'vue'
 import { useRehearsalStore } from '@/stores/rehearsal'
 import { Calendar, Clock, MapPin, Phone, Users, ChevronDown, ChevronUp, AlertCircle, Edit2, Check, X, Plus, Trash2 } from 'lucide-vue-next'
 import type { StaffMember, RehearsalStep } from '@/data/mockData'
+import { storeToRefs } from 'pinia'
 
 const rehearsalStore = useRehearsalStore()
+const { staff } = storeToRefs(rehearsalStore)
 const expandedNotice = ref<string | null>('1')
 
 const editingStaffId = ref<string | null>(null)
@@ -14,7 +16,11 @@ const showAddStaff = ref(false)
 const addStaffForm = ref({ name: '', role: '', phone: '' })
 
 const editingStepId = ref<string | null>(null)
-const editStepPerson = ref('')
+const editStepPersonId = ref<string>('')
+
+const staffOptions = computed(() => {
+  return staff.value.map(m => ({ id: m.id, name: m.name, role: m.role }))
+})
 
 const toggleNotice = (id: string) => {
   expandedNotice.value = expandedNotice.value === id ? null : id
@@ -83,17 +89,22 @@ const removeStaff = (id: string) => {
 
 const startEditStep = (step: RehearsalStep) => {
   editingStepId.value = step.id
-  editStepPerson.value = step.personInCharge
+  editStepPersonId.value = step.personInChargeId || ''
 }
 
 const cancelEditStep = () => {
   editingStepId.value = null
-  editStepPerson.value = ''
+  editStepPersonId.value = ''
 }
 
 const saveEditStep = () => {
   if (editingStepId.value) {
-    rehearsalStore.updateStep(editingStepId.value, { personInCharge: editStepPerson.value })
+    const selected = staff.value.find(m => m.id === editStepPersonId.value)
+    rehearsalStore.updateStepPerson(
+      editingStepId.value,
+      selected?.id,
+      selected?.name || ''
+    )
   }
   cancelEditStep()
 }
@@ -178,14 +189,15 @@ const saveEditStep = () => {
                   <template v-if="editingStepId === step.id">
                     <div class="flex items-center gap-2">
                       <span class="text-gray-500">负责人:</span>
-                      <input
-                        v-model="editStepPerson"
-                        type="text"
-                        class="px-2 py-1 border border-primary-200 rounded-lg text-sm w-36 outline-none focus:ring-2 focus:ring-primary-300"
-                        placeholder="输入负责人"
-                        @keyup.enter="saveEditStep"
-                        @keyup.escape="cancelEditStep"
-                      />
+                      <select
+                        v-model="editStepPersonId"
+                        class="px-2 py-1 border border-primary-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-primary-300 bg-white"
+                      >
+                        <option value="">请选择</option>
+                        <option v-for="opt in staffOptions" :key="opt.id" :value="opt.id">
+                          {{ opt.name }}（{{ opt.role }}）
+                        </option>
+                      </select>
                       <button @click="saveEditStep" class="p-1 text-morandi-green hover:bg-morandi-green/10 rounded">
                         <Check class="w-4 h-4" />
                       </button>
@@ -199,7 +211,7 @@ const saveEditStep = () => {
                       @click="startEditStep(step)"
                       class="flex items-center gap-1 hover:text-primary-500 transition-colors"
                     >
-                      <span>负责人: {{ step.personInCharge }}</span>
+                      <span>负责人: {{ step.personInCharge || '未分配' }}</span>
                       <Edit2 class="w-3 h-3" />
                     </button>
                   </template>

@@ -116,6 +116,7 @@ export interface ScheduleItem {
   description: string
   location: string
   personInCharge: string
+  personInChargeId?: string
   icon?: string
 }
 
@@ -125,6 +126,7 @@ export interface RehearsalStep {
   title: string
   description: string
   personInCharge: string
+  personInChargeId?: string
   notes: string
   duration: string
 }
@@ -280,24 +282,24 @@ export const mockDress: Dress[] = [
 ]
 
 export const mockSchedule: ScheduleItem[] = [
-  { id: '1', time: '06:00', title: '新娘化妆', description: '新娘开始化妆、做造型', location: '新娘家', personInCharge: '化妆师李明', icon: 'shirt' },
-  { id: '2', time: '08:00', title: '新郎接亲', description: '新郎带领接亲队伍出发', location: '新郎家', personInCharge: '伴郎张伟', icon: 'car' },
+  { id: '1', time: '06:00', title: '新娘化妆', description: '新娘开始化妆、做造型', location: '新娘家', personInCharge: '王芳', personInChargeId: '4', icon: 'shirt' },
+  { id: '2', time: '08:00', title: '新郎接亲', description: '新郎带领接亲队伍出发', location: '新郎家', personInCharge: '张伟', personInChargeId: '3', icon: 'car' },
   { id: '3', time: '09:00', title: '接亲游戏', description: '堵门、玩游戏、找鞋', location: '新娘家', personInCharge: '伴娘李娜', icon: 'heart' },
-  { id: '4', time: '10:00', title: '出门', description: '拜别父母，出发去酒店', location: '新娘家', personInCharge: '司仪王老师', icon: 'home' },
-  { id: '5', time: '11:00', title: '迎宾', description: '新人在酒店迎宾、合影', location: '酒店宴会厅', personInCharge: '总协调赵姐', icon: 'users' },
-  { id: '6', time: '12:00', title: '婚礼仪式', description: '正式婚礼仪式开始', location: '酒店宴会厅', personInCharge: '司仪王老师', icon: 'rings' },
-  { id: '7', time: '13:00', title: '婚宴开始', description: '婚宴、敬酒', location: '酒店宴会厅', personInCharge: '总协调赵姐', icon: 'utensils' }
+  { id: '4', time: '10:00', title: '出门', description: '拜别父母，出发去酒店', location: '新娘家', personInCharge: '王建国', personInChargeId: '1', icon: 'home' },
+  { id: '5', time: '11:00', title: '迎宾', description: '新人在酒店迎宾、合影', location: '酒店宴会厅', personInCharge: '赵敏', personInChargeId: '5', icon: 'users' },
+  { id: '6', time: '12:00', title: '婚礼仪式', description: '正式婚礼仪式开始', location: '酒店宴会厅', personInCharge: '王建国', personInChargeId: '1', icon: 'rings' },
+  { id: '7', time: '13:00', title: '婚宴开始', description: '婚宴、敬酒', location: '酒店宴会厅', personInCharge: '赵敏', personInChargeId: '5', icon: 'utensils' }
 ]
 
 export const mockWeddingDate = '2024-10-01'
 
 export const mockRehearsal: RehearsalStep[] = [
-  { id: '1', stepNumber: 1, title: '彩排签到', description: '所有相关人员到场签到，熟悉场地', personInCharge: '司仪王老师', notes: '请提前15分钟到场', duration: '15分钟' },
-  { id: '2', stepNumber: 2, title: '流程讲解', description: '讲解整个婚礼流程和注意事项', personInCharge: '司仪王老师', notes: '新人认真聆听', duration: '20分钟' },
-  { id: '3', stepNumber: 3, title: '入场彩排', description: '新人入场、走红毯、站定位', personInCharge: '司仪王老师', notes: '注意步速要慢，面带微笑', duration: '30分钟' },
-  { id: '4', stepNumber: 4, title: '仪式彩排', description: '宣誓、交换戒指、鞠躬', personInCharge: '司仪王老师', notes: '戒指由伴娘保管', duration: '25分钟' },
-  { id: '5', stepNumber: 5, title: '敬茶彩排', description: '向双方父母敬茶', personInCharge: '总协调赵姐', notes: '注意礼仪规范', duration: '20分钟' },
-  { id: '6', stepNumber: 6, title: '抛捧花彩排', description: '抛捧花环节定位', personInCharge: '司仪王老师', notes: '注意安全，避免误伤', duration: '10分钟' }
+  { id: '1', stepNumber: 1, title: '彩排签到', description: '所有相关人员到场签到，熟悉场地', personInCharge: '王建国', personInChargeId: '1', notes: '请提前15分钟到场', duration: '15分钟' },
+  { id: '2', stepNumber: 2, title: '流程讲解', description: '讲解整个婚礼流程和注意事项', personInCharge: '王建国', personInChargeId: '1', notes: '新人认真聆听', duration: '20分钟' },
+  { id: '3', stepNumber: 3, title: '入场彩排', description: '新人入场、走红毯、站定位', personInCharge: '王建国', personInChargeId: '1', notes: '注意步速要慢，面带微笑', duration: '30分钟' },
+  { id: '4', stepNumber: 4, title: '仪式彩排', description: '宣誓、交换戒指、鞠躬', personInCharge: '王建国', personInChargeId: '1', notes: '戒指由伴娘保管', duration: '25分钟' },
+  { id: '5', stepNumber: 5, title: '敬茶彩排', description: '向双方父母敬茶', personInCharge: '赵敏', personInChargeId: '5', notes: '注意礼仪规范', duration: '20分钟' },
+  { id: '6', stepNumber: 6, title: '抛捧花彩排', description: '抛捧花环节定位', personInCharge: '王建国', personInChargeId: '1', notes: '注意安全，避免误伤', duration: '10分钟' }
 ]
 
 export const mockRehearsalInfo: RehearsalInfo = {

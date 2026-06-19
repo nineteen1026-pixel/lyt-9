@@ -1,12 +1,19 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import { useScheduleStore } from '@/stores/schedule'
+import { useRehearsalStore } from '@/stores/rehearsal'
 import Timeline from '@/components/Timeline.vue'
 import { Calendar } from 'lucide-vue-next'
 import { storeToRefs } from 'pinia'
 
 const scheduleStore = useScheduleStore()
+const rehearsalStore = useRehearsalStore()
 const { weddingDate, items } = storeToRefs(scheduleStore)
+const { staff } = storeToRefs(rehearsalStore)
+
+const staffOptions = computed(() => {
+  return staff.value.map(m => ({ id: m.id, name: m.name, role: m.role }))
+})
 
 const formatDate = (dateStr: string) => {
   const date = new Date(dateStr)
@@ -24,7 +31,7 @@ const getTimePeriod = (time: string) => {
 const PERIOD_ORDER = ['上午', '下午', '晚上']
 type TimelineItem =
   | { type: 'separator'; label: string }
-  | { type: 'event'; time: string; title: string; description: string; location?: string; personInCharge?: string }
+  | { type: 'event'; id: string; time: string; title: string; description: string; location?: string; personInCharge?: string; personInChargeId?: string }
 
 const flatTimeline = computed<TimelineItem[]>(() => {
   const sorted = [...items.value].sort((a, b) => a.time.localeCompare(b.time))
@@ -51,6 +58,10 @@ const flatTimeline = computed<TimelineItem[]>(() => {
 const handleDateChange = (e: Event) => {
   const target = e.target as HTMLInputElement
   scheduleStore.setWeddingDate(target.value)
+}
+
+const handlePersonInChargeUpdate = (id: string, personId: string | undefined, personName: string) => {
+  scheduleStore.updateItemPerson(id, personId, personName)
 }
 </script>
 
@@ -81,7 +92,16 @@ const handleDateChange = (e: Event) => {
           />
         </div>
 
-        <Timeline :items="flatTimeline" />
+        <div class="mb-4 text-xs text-primary-400 text-right">
+          点击负责人可编辑
+        </div>
+
+        <Timeline
+          :items="flatTimeline"
+          :editable="true"
+          :staff-options="staffOptions"
+          @update:person-in-charge="handlePersonInChargeUpdate"
+        />
       </div>
     </div>
   </div>

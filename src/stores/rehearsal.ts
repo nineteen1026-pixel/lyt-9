@@ -44,10 +44,23 @@ export const useRehearsalStore = defineStore('rehearsal', () => {
     set(STORAGE_KEY_NOTICES, newValue)
   }, { deep: true })
 
+  function getStaffById(id: string) {
+    return staff.value.find(m => m.id === id)
+  }
+
+  function getStaffNameById(id?: string): string {
+    if (!id) return ''
+    const member = getStaffById(id)
+    return member ? member.name : ''
+  }
+
   function addStep(step: Omit<RehearsalStep, 'id'>) {
     const newStep: RehearsalStep = {
       ...step,
       id: Date.now().toString()
+    }
+    if (newStep.personInChargeId && !newStep.personInCharge) {
+      newStep.personInCharge = getStaffNameById(newStep.personInChargeId)
     }
     steps.value.push(newStep)
     steps.value.sort((a, b) => a.stepNumber - b.stepNumber)
@@ -56,14 +69,24 @@ export const useRehearsalStore = defineStore('rehearsal', () => {
   function updateStep(id: string, updates: Partial<Omit<RehearsalStep, 'id'>>) {
     const index = steps.value.findIndex(step => step.id === id)
     if (index !== -1) {
-      const oldPerson = steps.value[index].personInCharge
-      const newPerson = updates.personInCharge
       steps.value[index] = { ...steps.value[index], ...updates }
-      steps.value.sort((a, b) => a.stepNumber - b.stepNumber)
 
-      if (newPerson !== undefined && newPerson !== oldPerson && !isSyncing) {
-        syncStepPersonChange(oldPerson, newPerson)
+      if (updates.personInChargeId !== undefined) {
+        steps.value[index].personInCharge = getStaffNameById(updates.personInChargeId) || updates.personInCharge || steps.value[index].personInCharge
       }
+
+      steps.value.sort((a, b) => a.stepNumber - b.stepNumber)
+    }
+  }
+
+  function updateStepPerson(stepId: string, personId: string | undefined, personName: string) {
+    const index = steps.value.findIndex(s => s.id === stepId)
+    if (index === -1) return
+
+    steps.value[index] = {
+      ...steps.value[index],
+      personInChargeId: personId,
+      personInCharge: personName
     }
   }
 
@@ -84,6 +107,7 @@ export const useRehearsalStore = defineStore('rehearsal', () => {
       id: Date.now().toString()
     }
     staff.value.push(newMember)
+    return newMember
   }
 
   function updateStaff(id: string, updates: Partial<Omit<StaffMember, 'id'>>) {
@@ -94,7 +118,7 @@ export const useRehearsalStore = defineStore('rehearsal', () => {
       const newName = staff.value[index].name
 
       if (oldName !== newName && !isSyncing) {
-        syncStaffNameChange(oldName, newName)
+        cascadeStaffNameChange(id, newName)
       }
     }
   }
@@ -102,33 +126,28 @@ export const useRehearsalStore = defineStore('rehearsal', () => {
   function deleteStaff(id: string) {
     const index = staff.value.findIndex(m => m.id === id)
     if (index !== -1) {
-      const member = staff.value[index]
       staff.value.splice(index, 1)
 
       if (!isSyncing) {
-        syncStaffNameChange(member.name, '')
+        clearStaffReferences(id)
       }
     }
   }
 
-  function getStaffById(id: string) {
-    return staff.value.find(m => m.id === id)
-  }
-
-  function syncStaffNameChange(oldName: string, newName: string) {
-    if (!oldName || oldName === newName) return
+  function cascadeStaffNameChange(staffId: string, newName: string) {
+    if (!staffId) return
 
     isSyncing = true
     try {
       steps.value.forEach((step, idx) => {
-        if (step.personInCharge === oldName) {
+        if (step.personInChargeId === staffId) {
           steps.value[idx] = { ...step, personInCharge: newName }
         }
       })
 
       const scheduleStore = useScheduleStore()
       scheduleStore.items.forEach((item, idx) => {
-        if (item.personInCharge === oldName) {
+        if (item.personInChargeId === staffId) {
           scheduleStore.items[idx] = { ...item, personInCharge: newName }
         }
       })
@@ -137,49 +156,39 @@ export const useRehearsalStore = defineStore('rehearsal', () => {
     }
   }
 
-  function syncStepPersonChange(oldPerson: string, newPerson: string) {
-    if (oldPerson === newPerson) return
+  function clearStaffReferences(staffId: string) {
+    if (!staffId) return
 
     isSyncing = true
     try {
       steps.value.forEach((step, idx) => {
-        if (step.personInCharge === oldPerson) {
-          steps.value[idx] = { ...step, personInCharge: newPerson }
+        if (step.personInChargeId === staffId) {
+          steps.value[idx] = { ...step, personInChargeId: undefined, personInCharge: '' }
         }
       })
 
       const scheduleStore = useScheduleStore()
       scheduleStore.items.forEach((item, idx) => {
-        if (item.personInCharge === oldPerson) {
-          scheduleStore.items[idx] = { ...item, personInCharge: newPerson }
+        if (item.personInChargeId === staffId) {
+          scheduleStore.items[idx] = { ...item, personInChargeId: undefined, personInCharge: '' }
         }
       })
-
-      const existingStaff = staff.value.find(m => m.name === newPerson)
-      if (!existingStaff && newPerson.trim() !== '') {
-        const role = inferRoleFromName(newPerson)
-        addStaff({ name: newPerson, role, phone: '' })
-      }
     } finally {
       isSyncing = false
     }
   }
 
-  function syncFromSchedulePersonChange(oldPerson: string, newPerson: string) {
-    if (isSyncing || oldPerson === newPerson) return
+  function syncFromSchedulePersonChange(_itemId: string, personId: string | undefined, personName: string) {
+    if (isSyncing) return
 
     isSyncing = true
     try {
-      steps.value.forEach((step, idx) => {
-        if (step.personInCharge === oldPerson) {
-          steps.value[idx] = { ...step, personInCharge: newPerson }
+      if (personId) {
+        const existingStaff = staff.value.find(m => m.id === personId)
+        if (!existingStaff && personName.trim()) {
+          const role = inferRoleFromName(personName)
+          addStaff({ name: personName, role, phone: '' })
         }
-      })
-
-      const existingStaff = staff.value.find(m => m.name === newPerson)
-      if (!existingStaff && newPerson.trim() !== '') {
-        const role = inferRoleFromName(newPerson)
-        addStaff({ name: newPerson, role, phone: '' })
       }
     } finally {
       isSyncing = false
@@ -210,6 +219,8 @@ export const useRehearsalStore = defineStore('rehearsal', () => {
     updateStaff,
     deleteStaff,
     getStaffById,
+    getStaffNameById,
+    updateStepPerson,
     syncFromSchedulePersonChange
   }
 })
