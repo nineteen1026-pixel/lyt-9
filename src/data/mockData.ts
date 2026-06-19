@@ -6,6 +6,7 @@ export interface BudgetItem {
   color: string
   budget: number
   locked?: boolean
+  confirmed?: boolean
 }
 
 export type GuestStatus = 'confirmed' | 'pending' | 'declined'
@@ -166,13 +167,33 @@ export interface Notice {
 }
 
 export const mockBudget: BudgetItem[] = [
-  { id: '1', category: '场地', planned: 50000, actual: 48000, color: '#FF6B6B', budget: 50000, locked: true },
-  { id: '2', category: '餐饮', planned: 80000, actual: 78000, color: '#4ECDC4', budget: 80000 },
-  { id: '3', category: '婚纱', planned: 15000, actual: 16800, color: '#45B7D1', budget: 15000 },
-  { id: '4', category: '摄影', planned: 12000, actual: 11500, color: '#96CEB4', budget: 12000 },
-  { id: '5', category: '化妆', planned: 5000, actual: 4800, color: '#FFEAA7', budget: 5000 },
-  { id: '6', category: '礼仪', planned: 8000, actual: 7500, color: '#DDA0DD', budget: 8000 },
-  { id: '7', category: '其他', planned: 10000, actual: 9200, color: '#98D8C8', budget: 10000 }
+  { id: '1', category: '场地', planned: 50000, actual: 48000, color: '#FF6B6B', budget: 50000, locked: true, confirmed: true },
+  { id: '2', category: '餐饮', planned: 80000, actual: 78000, color: '#4ECDC4', budget: 80000, confirmed: false },
+  { id: '3', category: '婚纱', planned: 15000, actual: 16800, color: '#45B7D1', budget: 15000, confirmed: true },
+  { id: '4', category: '摄影', planned: 12000, actual: 11500, color: '#96CEB4', budget: 12000, confirmed: true },
+  { id: '5', category: '化妆', planned: 5000, actual: 4800, color: '#FFEAA7', budget: 5000, confirmed: false },
+  { id: '6', category: '礼仪', planned: 8000, actual: 7500, color: '#DDA0DD', budget: 8000, confirmed: false },
+  { id: '7', category: '其他', planned: 10000, actual: 9200, color: '#98D8C8', budget: 10000, confirmed: false }
+]
+
+export interface ChecklistItem {
+  id: string
+  title: string
+  description: string
+  budgetCategory: string | null
+  completed: boolean
+  order: number
+}
+
+export const mockChecklist: ChecklistItem[] = [
+  { id: '1', title: '预订婚礼场地', description: '确认场地并签订合同', budgetCategory: '场地', completed: true, order: 1 },
+  { id: '2', title: '确定摄影团队', description: '预约拍摄档期，签订合同', budgetCategory: '摄影', completed: true, order: 2 },
+  { id: '3', title: '选购婚纱礼服', description: '主纱、出门纱、敬酒服', budgetCategory: '婚纱', completed: true, order: 3 },
+  { id: '4', title: '预订婚宴餐饮', description: '确认菜单和桌数', budgetCategory: '餐饮', completed: false, order: 4 },
+  { id: '5', title: '预约化妆师', description: '试妆并确定婚礼当天跟妆', budgetCategory: '化妆', completed: false, order: 5 },
+  { id: '6', title: '聘请礼仪司仪', description: '确认主持和礼仪团队', budgetCategory: '礼仪', completed: false, order: 6 },
+  { id: '7', title: '采购婚戒首饰', description: '对戒、项链等', budgetCategory: '其他', completed: false, order: 7 },
+  { id: '8', title: '安排婚车车队', description: '预订婚车数量和路线', budgetCategory: '其他', completed: false, order: 8 }
 ]
 
 export const mockGuests: Guest[] = [

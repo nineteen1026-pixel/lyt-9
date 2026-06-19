@@ -8,7 +8,8 @@ import { usePhotographyStore } from '@/stores/photography'
 import { useDressStore } from '@/stores/dress'
 import PieChart from '@/components/PieChart.vue'
 import Toast from '@/components/Toast.vue'
-import { Wallet, TrendingDown, TrendingUp, Target, AlertTriangle, Info, Lock, MapPin, Camera, Shirt, ExternalLink, CheckCircle, RefreshCw, ChevronDown, ChevronUp } from 'lucide-vue-next'
+import { Wallet, TrendingDown, TrendingUp, Target, AlertTriangle, Info, Lock, MapPin, Camera, Shirt, ExternalLink, CheckCircle, CheckCircle2, Check, RefreshCw, ChevronDown, ChevronUp } from 'lucide-vue-next'
+import { useChecklistStore } from '@/stores/checklist'
 
 const router = useRouter()
 const budgetStore = useBudgetStore()
@@ -16,6 +17,7 @@ const guestsStore = useGuestsStore()
 const venuesStore = useVenuesStore()
 const photographyStore = usePhotographyStore()
 const dressStore = useDressStore()
+const checklistStore = useChecklistStore()
 
 const expandedCategory = ref<string | null>(null)
 
@@ -203,6 +205,16 @@ const goToCategory = (category: string) => {
 
           <div class="animate-slide-up bg-white rounded-2xl p-4 shadow-md" style="animation-delay: 0.2s">
             <div class="flex items-center gap-2 mb-2">
+              <div class="w-10 h-10 rounded-xl bg-green-100 flex items-center justify-center">
+                <CheckCircle2 class="w-5 h-5 text-green-500" />
+              </div>
+              <span class="text-sm text-gray-500">已确认</span>
+            </div>
+            <p class="text-xl font-bold text-green-500">{{ formatCurrency(budgetStore.confirmedBudget) }}</p>
+          </div>
+
+          <div class="animate-slide-up bg-white rounded-2xl p-4 shadow-md" style="animation-delay: 0.3s">
+            <div class="flex items-center gap-2 mb-2">
               <div class="w-10 h-10 rounded-xl bg-champagne-100 flex items-center justify-center">
                 <TrendingUp class="w-5 h-5 text-champagne-300" />
               </div>
@@ -211,24 +223,27 @@ const goToCategory = (category: string) => {
             <p class="text-xl font-bold text-champagne-300">{{ formatCurrency(totalSpent) }}</p>
           </div>
 
-          <div class="animate-slide-up bg-white rounded-2xl p-4 shadow-md" style="animation-delay: 0.3s">
-            <div class="flex items-center gap-2 mb-2">
-              <div class="w-10 h-10 rounded-xl bg-green-100 flex items-center justify-center">
-                <TrendingDown class="w-5 h-5 text-green-500" />
-              </div>
-              <span class="text-sm text-gray-500">剩余</span>
-            </div>
-            <p class="text-xl font-bold text-green-500">{{ formatCurrency(remaining) }}</p>
-          </div>
-
           <div class="animate-slide-up bg-white rounded-2xl p-4 shadow-md" style="animation-delay: 0.4s">
             <div class="flex items-center gap-2 mb-2">
               <div class="w-10 h-10 rounded-xl bg-primary-100 flex items-center justify-center">
                 <Target class="w-5 h-5 text-primary-500" />
               </div>
-              <span class="text-sm text-gray-500">进度</span>
+              <span class="text-sm text-gray-500">执行进度</span>
             </div>
-            <p class="text-xl font-bold text-primary-500">{{ progress.toFixed(1) }}%</p>
+            <p class="text-xl font-bold text-primary-500">{{ budgetStore.executionProgress.toFixed(1) }}%</p>
+          </div>
+        </div>
+
+        <div class="animate-slide-up bg-white rounded-2xl p-4 shadow-md mb-6" style="animation-delay: 0.45s">
+          <div class="flex items-center justify-between mb-2">
+            <span class="text-sm font-medium text-gray-700">分类确认进度</span>
+            <span class="text-sm text-gray-500">{{ budgetStore.confirmedCount }}/{{ budgetStore.items.length }} 项</span>
+          </div>
+          <div class="w-full bg-gray-100 rounded-full h-2.5 overflow-hidden">
+            <div
+              class="h-full bg-gradient-to-r from-green-400 to-green-500 rounded-full transition-all duration-1000"
+              :style="{ width: `${budgetStore.confirmationProgress}%` }"
+            ></div>
           </div>
         </div>
 
@@ -253,7 +268,8 @@ const goToCategory = (category: string) => {
               class="bg-white rounded-xl shadow-sm hover:shadow-md transition-all duration-300 overflow-hidden"
               :class="{
                 'ring-2 ring-red-400 bg-red-50': isOverBudget(item.budget, item.actual),
-                'ring-2 ring-primary-300 bg-primary-50/50': item.locked
+                'ring-2 ring-primary-300 bg-primary-50/50': item.locked,
+                'ring-2 ring-green-300 bg-green-50/30': item.confirmed && !item.locked && !isOverBudget(item.budget, item.actual)
               }"
               :style="{ animationDelay: `${0.8 + index * 0.1}s` }"
             >
@@ -277,11 +293,15 @@ const goToCategory = (category: string) => {
                       <div v-if="item.locked" class="absolute -top-1 -right-1 w-4 h-4 bg-primary-500 rounded-full flex items-center justify-center">
                         <Lock class="w-2.5 h-2.5 text-white" />
                       </div>
+                      <div v-else-if="item.confirmed" class="absolute -top-1 -right-1 w-4 h-4 bg-green-500 rounded-full flex items-center justify-center">
+                        <Check class="w-2.5 h-2.5 text-white" />
+                      </div>
                     </div>
                     <div>
                       <div class="flex items-center gap-1.5">
                         <p class="font-medium" :class="isOverBudget(item.budget, item.actual) ? 'text-red-600' : 'text-gray-800'">{{ item.category }}</p>
                         <span v-if="item.locked" class="text-xs text-primary-500 bg-primary-100 px-1.5 py-0.5 rounded-full">已锁定</span>
+                        <span v-else-if="item.confirmed" class="text-xs text-green-600 bg-green-100 px-1.5 py-0.5 rounded-full">支出已确认</span>
                       </div>
                       <p class="text-xs" :class="isOverBudget(item.budget, item.actual) ? 'text-red-400' : 'text-gray-400'">预算: {{ formatCurrency(item.budget) }}</p>
                     </div>

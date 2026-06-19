@@ -81,10 +81,36 @@ export const useBudgetStore = defineStore('budget', () => {
     return items.value.find(item => item.category === category)
   }
 
+  function confirmCategory(category: string) {
+    const index = items.value.findIndex(item => item.category === category)
+    if (index !== -1) {
+      items.value[index].confirmed = true
+    }
+  }
+
+  function unconfirmCategory(category: string) {
+    const index = items.value.findIndex(item => item.category === category)
+    if (index !== -1) {
+      items.value[index].confirmed = false
+    }
+  }
+
+  function isCategoryConfirmed(category: string) {
+    const item = items.value.find(item => item.category === category)
+    return item?.confirmed ?? false
+  }
+
   const totalBudget = computed(() => items.value.reduce((sum, item) => sum + (item.budget ?? item.planned), 0))
   const totalSpent = computed(() => items.value.reduce((sum, item) => sum + item.actual, 0))
   const remaining = computed(() => totalBudget.value - totalSpent.value)
   const progress = computed(() => totalBudget.value > 0 ? (totalSpent.value / totalBudget.value) * 100 : 0)
+
+  const confirmedBudget = computed(() =>
+    items.value.filter(item => item.confirmed).reduce((sum, item) => sum + (item.budget ?? item.planned), 0)
+  )
+  const confirmedCount = computed(() => items.value.filter(item => item.confirmed).length)
+  const confirmationProgress = computed(() => items.value.length > 0 ? (confirmedCount.value / items.value.length) * 100 : 0)
+  const executionProgress = computed(() => totalBudget.value > 0 ? (confirmedBudget.value / totalBudget.value) * 100 : 0)
 
   const totalPlanned = () => items.value.reduce((sum, item) => sum + item.planned, 0)
   const totalActual = () => items.value.reduce((sum, item) => sum + item.actual, 0)
@@ -121,11 +147,18 @@ export const useBudgetStore = defineStore('budget', () => {
     unlockCategory,
     isCategoryLocked,
     getItemByCategory,
+    confirmCategory,
+    unconfirmCategory,
+    isCategoryConfirmed,
     syncContractedToBudget,
     totalBudget,
     totalSpent,
     remaining,
     progress,
+    confirmedBudget,
+    confirmedCount,
+    confirmationProgress,
+    executionProgress,
     totalPlanned,
     totalActual
   }

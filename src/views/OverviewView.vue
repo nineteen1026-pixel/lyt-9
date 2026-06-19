@@ -8,6 +8,7 @@ import { usePhotographyStore } from '@/stores/photography'
 import { useDressStore } from '@/stores/dress'
 import { useScheduleStore } from '@/stores/schedule'
 import { useRehearsalStore } from '@/stores/rehearsal'
+import { useChecklistStore } from '@/stores/checklist'
 import PieChart from '@/components/PieChart.vue'
 import {
   LayoutDashboard,
@@ -21,6 +22,7 @@ import {
   Clock,
   AlertCircle,
   CheckCircle2,
+  Check,
   ChevronRight,
   TrendingUp,
   TrendingDown,
@@ -37,10 +39,12 @@ const photographyStore = usePhotographyStore()
 const dressStore = useDressStore()
 const scheduleStore = useScheduleStore()
 const rehearsalStore = useRehearsalStore()
+const checklistStore = useChecklistStore()
 
 const currentDate = ref(new Date())
 
 onMounted(() => {
+  checklistStore.syncBudgetConfirmations()
   const timer = setInterval(() => {
     currentDate.value = new Date()
   }, 60000)
@@ -644,99 +648,120 @@ const navigateTo = (path: string) => {
           <div class="flex items-center justify-between mb-4">
             <h2 class="text-lg font-bold text-gray-800 flex items-center gap-2">
               <Wallet class="w-5 h-5 text-primary-500" />
-              预算执行率
+              预算执行进度
             </h2>
-            <div class="flex items-center gap-1" :class="getProgressColor(budgetExecutionRate)">
-              <component
-                :is="budgetExecutionRate > 80 ? TrendingUp : TrendingDown"
-                class="w-4 h-4"
-              />
-              <span class="text-sm font-bold">{{ budgetExecutionRate.toFixed(1) }}%</span>
+            <div class="flex items-center gap-1" :class="getProgressColor(budgetStore.executionProgress)">
+              <CheckCircle2 class="w-4 h-4" />
+              <span class="text-sm font-bold">{{ budgetStore.executionProgress.toFixed(1) }}%</span>
             </div>
           </div>
 
-          <div class="grid grid-cols-3 gap-3 mb-4">
+          <div class="grid grid-cols-2 gap-3 mb-4">
             <div class="text-center p-3 bg-primary-50 rounded-xl">
               <p class="text-xs text-gray-500 mb-1">总预算</p>
               <p class="text-sm font-bold text-gray-800">{{ formatCurrency(totalBudget) }}</p>
             </div>
-            <div class="text-center p-3 bg-champagne-50 rounded-xl">
-              <p class="text-xs text-gray-500 mb-1">已支出</p>
-              <p class="text-sm font-bold text-champagne-500">{{ formatCurrency(totalSpent) }}</p>
-            </div>
             <div class="text-center p-3 bg-green-50 rounded-xl">
-              <p class="text-xs text-gray-500 mb-1">剩余</p>
-              <p class="text-sm font-bold" :class="remaining >= 0 ? 'text-green-500' : 'text-red-500'">
-                {{ formatCurrency(Math.abs(remaining)) }}
-              </p>
+              <p class="text-xs text-gray-500 mb-1">已确认支出</p>
+              <p class="text-sm font-bold text-green-600">{{ formatCurrency(budgetStore.confirmedBudget) }}</p>
             </div>
           </div>
 
-          <div class="w-full bg-gray-100 rounded-full h-3 mb-4 overflow-hidden">
-            <div
-              class="h-full rounded-full transition-all duration-1000"
-              :class="budgetExecutionRate > 100 ? 'bg-gradient-to-r from-red-400 to-red-500' : 'bg-gradient-to-r from-primary-400 to-primary-500'"
-              :style="{ width: `${Math.min(budgetExecutionRate, 100)}%` }"
-            ></div>
+          <div class="mb-4">
+            <div class="flex items-center justify-between mb-2">
+              <span class="text-xs text-gray-500">分类确认进度</span>
+              <span class="text-xs font-medium text-gray-700">{{ budgetStore.confirmedCount }}/{{ budgetStore.items.length }} 项</span>
+            </div>
+            <div class="w-full bg-gray-100 rounded-full h-2.5 overflow-hidden">
+              <div
+                class="h-full bg-gradient-to-r from-green-400 to-green-500 rounded-full transition-all duration-1000"
+                :style="{ width: `${budgetStore.confirmationProgress}%` }"
+              ></div>
+            </div>
           </div>
 
-          <PieChart :data="pieData" class="w-full h-56" />
+          <div class="mb-4">
+            <div class="flex items-center justify-between mb-2">
+              <span class="text-xs text-gray-500">金额执行进度</span>
+              <span class="text-xs font-medium text-gray-700">{{ budgetStore.executionProgress.toFixed(1) }}%</span>
+            </div>
+            <div class="w-full bg-gray-100 rounded-full h-2.5 overflow-hidden">
+              <div
+                class="h-full rounded-full transition-all duration-1000"
+                :class="budgetStore.executionProgress > 100 ? 'bg-gradient-to-r from-red-400 to-red-500' : 'bg-gradient-to-r from-primary-400 to-primary-500'"
+                :style="{ width: `${Math.min(budgetStore.executionProgress, 100)}%` }"
+              ></div>
+            </div>
+          </div>
+
+          <PieChart :data="pieData" class="w-full h-48" />
         </div>
 
         <div class="animate-slide-up bg-white rounded-2xl p-4 shadow-lg" style="animation-delay: 0.3s">
           <div class="flex items-center justify-between mb-4">
             <h2 class="text-lg font-bold text-gray-800 flex items-center gap-2">
-              <Bell class="w-5 h-5 text-primary-500" />
-              近期待办
+              <ListChecks class="w-5 h-5 text-primary-500" />
+              备婚任务清单
             </h2>
-            <span class="text-sm text-gray-500">{{ todoItems.length }} 项</span>
+            <span class="text-sm text-gray-500">{{ checklistStore.completedCount }}/{{ checklistStore.totalCount }} 已完成</span>
           </div>
 
-          <div v-if="todoItems.length === 0" class="text-center py-8">
+          <div class="w-full bg-gray-100 rounded-full h-2 mb-4 overflow-hidden">
+            <div
+              class="h-full bg-gradient-to-r from-primary-400 to-primary-500 rounded-full transition-all duration-700"
+              :style="{ width: `${checklistStore.progress}%` }"
+            ></div>
+          </div>
+
+          <div v-if="checklistStore.items.length === 0" class="text-center py-8">
             <CheckCircle2 class="w-16 h-16 text-green-400 mx-auto mb-3" />
             <p class="text-gray-500">太棒了！暂无待办事项</p>
           </div>
 
-          <div v-else class="space-y-3">
+          <div v-else class="space-y-2">
             <div
-              v-for="(item, index) in todoItems"
+              v-for="(item, index) in checklistStore.items"
               :key="item.id"
-              @click="navigateTo(item.modulePath)"
-              class="flex items-start gap-3 p-3 rounded-xl border transition-all duration-300 cursor-pointer hover:shadow-md hover:scale-[1.02]"
+              class="flex items-start gap-3 p-3 rounded-xl border transition-all duration-300"
               :class="[
-                item.completed ? 'bg-gray-50 border-gray-200 opacity-60' : 'bg-white border-gray-100',
-                item.priority === 'high' && !item.completed ? 'ring-1 ring-red-200' : ''
+                item.completed ? 'bg-green-50/50 border-green-100' : 'bg-white border-gray-100 hover:shadow-sm'
               ]"
               :style="{ animationDelay: `${0.4 + index * 0.05}s` }"
             >
-              <div
-                class="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0"
-                :class="getPriorityColor(item.priority)"
+              <button
+                @click.stop="checklistStore.toggleComplete(item.id)"
+                class="w-6 h-6 rounded-full border-2 flex items-center justify-center flex-shrink-0 mt-0.5 transition-all duration-200 hover:scale-110"
+                :class="[
+                  item.completed
+                    ? 'bg-green-500 border-green-500'
+                    : 'bg-white border-gray-300 hover:border-primary-400'
+                ]"
               >
-                <component :is="item.completed ? CheckCircle2 : item.icon" class="w-5 h-5" />
-              </div>
+                <Check v-if="item.completed" class="w-3.5 h-3.5 text-white" />
+              </button>
               <div class="flex-1 min-w-0">
-                <div class="flex items-center justify-between gap-2">
+                <div class="flex items-center gap-2">
                   <h3
-                    class="font-semibold text-sm truncate"
+                    class="font-semibold text-sm"
                     :class="item.completed ? 'text-gray-400 line-through' : 'text-gray-800'"
                   >
                     {{ item.title }}
                   </h3>
                   <span
-                    class="text-xs font-medium px-2 py-0.5 rounded-full flex-shrink-0 border"
-                    :class="getPriorityColor(item.priority)"
+                    v-if="item.budgetCategory"
+                    class="text-[10px] px-1.5 py-0.5 rounded-full flex-shrink-0"
+                    :class="[
+                      budgetStore.isCategoryConfirmed(item.budgetCategory)
+                        ? 'bg-green-100 text-green-600'
+                        : 'bg-champagne-50 text-champagne-400'
+                    ]"
                   >
-                    {{ getDaysLabel(item) }}
+                    {{ item.budgetCategory }}
+                    <span v-if="budgetStore.isCategoryConfirmed(item.budgetCategory)"> · 已确认</span>
                   </span>
                 </div>
-                <p class="text-xs text-gray-500 mt-1 truncate">{{ item.description }}</p>
-                <div class="flex items-center gap-2 mt-2">
-                  <span class="text-xs text-gray-400">{{ item.module }}</span>
-                  <span v-if="item.date" class="text-xs text-gray-400">· {{ item.date }}</span>
-                </div>
+                <p class="text-xs text-gray-500 mt-1">{{ item.description }}</p>
               </div>
-              <ChevronRight class="w-4 h-4 text-gray-300 flex-shrink-0 mt-1" />
             </div>
           </div>
         </div>
