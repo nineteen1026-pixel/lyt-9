@@ -69,8 +69,12 @@ export const modulePermissions: ModulePermission[] = [
   }
 ]
 
+export function getModulePermission(moduleId: string): ModulePermission | undefined {
+  return modulePermissions.find(m => m.id === moduleId)
+}
+
 export function isModuleVisible(moduleId: string, role: WeddingRole): boolean {
-  const module = modulePermissions.find(m => m.id === moduleId)
+  const module = getModulePermission(moduleId)
   if (!module) return true
   if (module.visibility === 'both') return true
   return module.visibility === role

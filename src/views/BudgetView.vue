@@ -23,9 +23,7 @@ const photographyStore = usePhotographyStore()
 const dressStore = useDressStore()
 const checklistStore = useChecklistStore()
 
-const visibleItems = computed(() => 
-  budgetStore.items.filter(item => isBudgetVisible(item.category, roleStore.currentRole))
-)
+const visibleItems = computed(() => budgetStore.items)
 
 const expandedCategory = ref<string | null>(null)
 
@@ -306,7 +304,7 @@ const getOwnerClass = (category: string) => {
         <div class="animate-slide-up" style="animation-delay: 0.7s">
           <div class="flex items-center justify-between mb-4">
             <h2 class="text-lg font-bold text-gray-800">支出明细</h2>
-            <span class="text-xs text-gray-400">显示 {{ visibleItems.length }} 项 {{ roleStore.roleLabel }}相关支出</span>
+            <span class="text-xs text-gray-400">共 {{ visibleItems.length }} 项 · 双方共享可见</span>
           </div>
           <div class="space-y-3">
             <div

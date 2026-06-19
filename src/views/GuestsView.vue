@@ -14,11 +14,11 @@ const roleStore = useRoleStore()
 const guestsStore = useGuestsStore()
 const searchQuery = ref('')
 const activeFilter = ref<GuestStatus | 'all'>('all')
-const activeGroup = ref<GuestGroup | 'all'>(roleStore.currentRole)
+const activeGroup = ref<GuestGroup | 'all'>('all')
 const viewMode = ref<'list' | 'table'>('list')
 
-watch(() => roleStore.currentRole, (newRole) => {
-  activeGroup.value = newRole
+watch(() => roleStore.currentRole, () => {
+  activeGroup.value = 'all'
 })
 
 const draggedGuestId = ref<string | null>(null)

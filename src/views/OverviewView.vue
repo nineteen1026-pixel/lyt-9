@@ -98,9 +98,7 @@ const formatDate = (date: Date) => {
 
 const expectedBudgetCategories = ['场地', '餐饮', '婚纱', '摄影', '化妆', '礼仪', '其他']
 
-const visibleBudgetCategories = computed(() => 
-  expectedBudgetCategories.filter(cat => isBudgetVisible(cat, roleStore.currentRole))
-)
+const visibleBudgetCategories = computed(() => expectedBudgetCategories)
 
 const budgetCompletionProgress = computed(() => {
   const plannedCount = visibleBudgetCategories.value.filter(cat =>
@@ -303,9 +301,7 @@ const overallProgress = computed(() => {
   return total / modulesProgress.value.length
 })
 
-const visibleBudgetItems = computed(() => 
-  budgetStore.items.filter(item => isBudgetVisible(item.category, roleStore.currentRole))
-)
+const visibleBudgetItems = computed(() => budgetStore.items)
 
 const totalBudget = computed(() => 
   visibleBudgetItems.value.reduce((sum, item) => sum + (item.budget ?? item.planned), 0)
