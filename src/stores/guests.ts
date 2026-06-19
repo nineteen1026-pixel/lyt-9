@@ -44,6 +44,7 @@ export interface CapacityComparison {
   confirmedAttendance: number
   pendingAttendance: number
   totalAssigned: number
+  totalNonDeclined: number
   overflow: number
   utilizationRate: number
   status: 'safe' | 'warning' | 'danger' | 'no-venue'
@@ -124,6 +125,22 @@ export const useGuestsStore = defineStore('guests', () => {
   const pendingCount = computed(() => guests.value.filter(g => g.status === 'pending').length)
   const declinedCount = computed(() => guests.value.filter(g => g.status === 'declined').length)
 
+  const confirmedAttendanceCount = computed(() =>
+    guests.value.filter(g => g.status === 'confirmed').length
+  )
+  const pendingAttendanceCount = computed(() =>
+    guests.value.filter(g => g.status === 'pending').length
+  )
+  const totalNonDeclinedCount = computed(() =>
+    guests.value.filter(g => g.status !== 'declined').length
+  )
+  const confirmedUnassignedCount = computed(() =>
+    guests.value.filter(g => g.status === 'confirmed' && g.tableNumber === null).length
+  )
+  const pendingUnassignedCount = computed(() =>
+    guests.value.filter(g => g.status === 'pending' && g.tableNumber === null).length
+  )
+
   const groomGuests = computed(() => guests.value.filter(g => g.group === 'groom'))
   const brideGuests = computed(() => guests.value.filter(g => g.group === 'bride'))
   const bothGuests = computed(() => guests.value.filter(g => g.group === 'both'))
@@ -139,11 +156,11 @@ export const useGuestsStore = defineStore('guests', () => {
   const hasBookedVenue = computed(() => bookedVenueCapacity.value > 0)
 
   const isOverCapacity = computed(() =>
-    hasBookedVenue.value && assignedGuestsCount.value > bookedVenueCapacity.value
+    hasBookedVenue.value && totalNonDeclinedCount.value > bookedVenueCapacity.value
   )
 
   const capacityOverflow = computed(() =>
-    Math.max(0, assignedGuestsCount.value - bookedVenueCapacity.value)
+    Math.max(0, totalNonDeclinedCount.value - bookedVenueCapacity.value)
   )
 
   function validatePerTableCapacity(tableNumber: number): PerTableValidationResult {
@@ -279,10 +296,10 @@ export const useGuestsStore = defineStore('guests', () => {
 
   const capacityWarning = computed(() => {
     if (!hasBookedVenue.value) {
-      if (assignedGuestsCount.value > 0) {
+      if (totalNonDeclinedCount.value > 0) {
         return {
           title: '未预订场地预警',
-          content: '当前尚未预订场地，请先预订场地后再进行分桌安排。'
+          content: `当前共有${totalNonDeclinedCount.value}位宾客（已确认${confirmedCount.value}人，待确认${pendingCount.value}人）尚未预订场地，请先预订场地后再进行分桌安排。`
         }
       }
       return {
@@ -292,9 +309,26 @@ export const useGuestsStore = defineStore('guests', () => {
     }
     if (isOverCapacity.value) {
       const venueNames = venuesStore.bookedVenues.map(v => v.name).join('、')
+      const unassignedConfirmed = confirmedUnassignedCount.value
+      const unassignedPending = pendingUnassignedCount.value
+      let extraMsg = ''
+      if (unassignedConfirmed > 0 || unassignedPending > 0) {
+        const parts: string[] = []
+        if (unassignedConfirmed > 0) parts.push('已确认未分桌' + unassignedConfirmed + '人')
+        if (unassignedPending > 0) parts.push('待确认未分桌' + unassignedPending + '人')
+        extraMsg = '（其中' + parts.join('、') + '）'
+      }
       return {
         title: '场地席位超员预警',
-        content: `已预订场地「${venueNames}」总容量为${bookedVenueCapacity.value}人，当前已分配${assignedGuestsCount.value}人，超出${capacityOverflow.value}人。请调整分桌安排或更换更大容量的场地。`
+        content: `已预订场地「${venueNames}」总容量为${bookedVenueCapacity.value}人，当前共有${totalNonDeclinedCount.value}位宾客${extraMsg}，超出${capacityOverflow.value}人。请调整分桌安排或更换更大容量的场地。`
+      }
+    }
+    if (confirmedUnassignedCount.value > 0) {
+      const venueNames = venuesStore.bookedVenues.map(v => v.name).join('、')
+      const remaining = bookedVenueCapacity.value - totalNonDeclinedCount.value
+      return {
+        title: '已确认宾客待分桌提示',
+        content: `已预订场地「${venueNames}」总容量${bookedVenueCapacity.value}人，还有${confirmedUnassignedCount.value}位已确认宾客尚未分配桌次${remaining > 0 ? `，剩余${remaining}个席位可供安排` : ''}。请尽快完成分桌。`
       }
     }
     return null
@@ -613,14 +647,6 @@ export const useGuestsStore = defineStore('guests', () => {
     XLSX.writeFile(workbook, '宾客名单导入模板.xlsx')
   }
 
-  const confirmedAttendanceCount = computed(() =>
-    guests.value.filter(g => g.status === 'confirmed' && g.tableNumber !== null).length
-  )
-
-  const pendingAttendanceCount = computed(() =>
-    guests.value.filter(g => g.status === 'pending' && g.tableNumber !== null).length
-  )
-
   const capacityComparison = computed<CapacityComparison>(() => {
     if (!hasBookedVenue.value) {
       return {
@@ -628,6 +654,7 @@ export const useGuestsStore = defineStore('guests', () => {
         confirmedAttendance: confirmedAttendanceCount.value,
         pendingAttendance: pendingAttendanceCount.value,
         totalAssigned: assignedGuestsCount.value,
+        totalNonDeclined: totalNonDeclinedCount.value,
         overflow: 0,
         utilizationRate: 0,
         status: 'no-venue'
@@ -637,7 +664,7 @@ export const useGuestsStore = defineStore('guests', () => {
     const capacity = bookedVenueCapacity.value
     const confirmed = confirmedAttendanceCount.value
     const pending = pendingAttendanceCount.value
-    const total = assignedGuestsCount.value
+    const total = totalNonDeclinedCount.value
     const overflow = Math.max(0, total - capacity)
     const rate = capacity > 0 ? total / capacity : 0
 
@@ -652,7 +679,8 @@ export const useGuestsStore = defineStore('guests', () => {
       venueCapacity: capacity,
       confirmedAttendance: confirmed,
       pendingAttendance: pending,
-      totalAssigned: total,
+      totalAssigned: assignedGuestsCount.value,
+      totalNonDeclined: total,
       overflow,
       utilizationRate: rate,
       status
@@ -662,104 +690,182 @@ export const useGuestsStore = defineStore('guests', () => {
   function generateAdjustmentPlans(): AdjustmentPlan[] {
     const plans: AdjustmentPlan[] = []
     const comparison = capacityComparison.value
-    if (comparison.overflow <= 0) return plans
-
-    const overflow = comparison.overflow
-    const confirmedGuests = guests.value.filter(g => g.status === 'confirmed' && g.tableNumber !== null)
-    const pendingGuests = guests.value.filter(g => g.status === 'pending' && g.tableNumber !== null)
     const maxPerTable = maxGuestsPerTable.value
+    const hasOverflow = comparison.overflow > 0
+    const hasUnassigned = confirmedUnassignedCount.value > 0 || pendingUnassignedCount.value > 0
+    if (!hasOverflow && !hasUnassigned) return plans
+
+    const unassignedConfirmed = guests.value
+      .filter(g => g.status === 'confirmed' && g.tableNumber === null)
+    const unassignedPending = guests.value
+      .filter(g => g.status === 'pending' && g.tableNumber === null)
+    const allUnassigned = [...unassignedConfirmed, ...unassignedPending]
+
+    const overfullTables = tableStats.value
+      .filter(t => t.count > maxPerTable)
+      .sort((a, b) => b.count - a.count)
+
+    const maxTableNum = tableStats.value.length > 0
+      ? Math.max(...tableStats.value.map(t => t.tableNumber))
+      : 0
+
+    function collectOverflowGuests(overflowCount: number): Guest[] {
+      const result: Guest[] = []
+
+      const unassignedList = [...unassignedConfirmed, ...unassignedPending]
+      for (const g of unassignedList) {
+        if (result.length >= overflowCount) break
+        result.push(g)
+      }
+
+      for (const table of overfullTables) {
+        if (result.length >= overflowCount) break
+        const overCount = table.count - maxPerTable
+        const pendingInTable = table.guests.filter(g => g.status === 'pending')
+        const confirmedInTable = table.guests.filter(g => g.status === 'confirmed')
+        const sorted = [...pendingInTable, ...confirmedInTable]
+        for (let i = 0; i < Math.min(overCount, sorted.length) && result.length < overflowCount; i++) {
+          result.push(sorted[i])
+        }
+      }
+
+      return result
+    }
 
     {
       const steps: AdjustmentStep[] = []
-      let remaining = overflow
+      let resolved = 0
 
-      const sortedPending = [...pendingGuests].sort((a, b) => {
-        const aTableGuests = guests.value.filter(g => g.tableNumber === a.tableNumber && g.status !== 'declined').length
-        const bTableGuests = guests.value.filter(g => g.tableNumber === b.tableNumber && g.status !== 'declined').length
-        return bTableGuests - aTableGuests
+      const assignedPending = guests.value.filter(g => g.status === 'pending' && g.tableNumber !== null)
+      const sortedPending = [...assignedPending].sort((a, b) => {
+        const aTable = tableStats.value.find(t => t.tableNumber === a.tableNumber)
+        const bTable = tableStats.value.find(t => t.tableNumber === b.tableNumber)
+        return (bTable?.count || 0) - (aTable?.count || 0)
       })
 
+      const targetReduce = Math.max(comparison.overflow, 0)
+
       for (const guest of sortedPending) {
-        if (remaining <= 0) break
+        if (targetReduce > 0 && resolved >= targetReduce) break
         steps.push({
           type: 'unassign-pending',
-          description: `将待确认宾客「${guest.name}」从${guest.tableNumber}号桌移出，优先保障已确认宾客`,
+          description: `将待确认宾客「${guest.name}」从${guest.tableNumber}号桌移出，优先保障已确认宾客席位`,
           guestId: guest.id,
           guestName: guest.name,
           fromTable: guest.tableNumber!
         })
-        remaining--
+        resolved++
       }
 
-      if (steps.length > 0) {
+      if (steps.length > 0 || hasUnassigned) {
+        const totalResolved = resolved + (hasOverflow ? 0 : unassignedConfirmed.length)
         plans.push({
           strategy: 'unassign-pending',
           strategyDescription: `优先保障已确认宾客席位，将${steps.length}位待确认宾客移出分桌`,
           steps,
-          resolvedOverflow: Math.min(overflow, steps.length),
-          remainingOverflow: Math.max(0, overflow - steps.length)
+          resolvedOverflow: steps.length,
+          remainingOverflow: Math.max(0, comparison.overflow - steps.length)
         })
       }
     }
 
     {
       const steps: AdjustmentStep[] = []
-      const tablesNeeded = Math.ceil(overflow / maxPerTable)
+      const guestsToSeat: Guest[] = []
 
+      if (hasOverflow) {
+        guestsToSeat.push(...collectOverflowGuests(comparison.overflow))
+      } else if (hasUnassigned) {
+        guestsToSeat.push(...allUnassigned)
+      }
+
+      const totalSeatsNeeded = guestsToSeat.length
+      const tablesNeeded = Math.ceil(totalSeatsNeeded / maxPerTable)
+
+      const newTableNumbers: number[] = []
       for (let i = 1; i <= tablesNeeded; i++) {
-        const newTableNum = (tableStats.value.length > 0
-          ? Math.max(...tableStats.value.map(t => t.tableNumber))
-          : 0) + i
+        const newNum = maxTableNum + i
+        newTableNumbers.push(newNum)
         steps.push({
           type: 'add-table',
-          description: `新增${newTableNum}号桌（容纳${maxPerTable}人），可安排溢出宾客`,
-          newTableNumber: newTableNum
+          description: `新增${newNum}号桌（每桌${maxPerTable}人）`,
+          newTableNumber: newNum
         })
       }
 
-      const overflowGuests = guests.value
-        .filter(g => g.tableNumber === null && g.status !== 'declined')
-        .slice(0, overflow)
-
-      for (const guest of overflowGuests) {
-        const targetTable = steps.find(s => s.newTableNumber !== undefined)
-        if (targetTable) {
+      let guestIdx = 0
+      for (let t = 0; t < newTableNumbers.length && guestIdx < guestsToSeat.length; t++) {
+        const tableNum = newTableNumbers[t]
+        for (let s = 0; s < maxPerTable && guestIdx < guestsToSeat.length; s++) {
+          const guest = guestsToSeat[guestIdx]
+          const fromTable = guest.tableNumber
+          const moveDesc = fromTable !== null
+            ? `从${fromTable}号桌调至${tableNum}号桌`
+            : `安排至${tableNum}号桌`
           steps.push({
             type: 'move',
-            description: `将未分桌宾客「${guest.name}」安排至${targetTable.newTableNumber}号桌`,
+            description: `将宾客「${guest.name}」${moveDesc}`,
             guestId: guest.id,
             guestName: guest.name,
-            toTable: targetTable.newTableNumber
+            fromTable: fromTable ?? undefined,
+            toTable: tableNum
           })
+          guestIdx++
         }
       }
 
-      plans.push({
-        strategy: 'add-table',
-        strategyDescription: `新增${tablesNeeded}桌以容纳${overflow}位溢出宾客`,
-        steps,
-        resolvedOverflow: overflow,
-        remainingOverflow: 0
-      })
+      if (tablesNeeded > 0) {
+        const desc = hasOverflow
+          ? `新增${tablesNeeded}桌以容纳${totalSeatsNeeded}位溢出宾客`
+          : `新增${tablesNeeded}桌以安排${totalSeatsNeeded}位未分桌宾客`
+        plans.push({
+          strategy: 'add-table',
+          strategyDescription: desc,
+          steps,
+          resolvedOverflow: totalSeatsNeeded,
+          remainingOverflow: Math.max(0, comparison.overflow - totalSeatsNeeded)
+        })
+      }
     }
 
     {
       const steps: AdjustmentStep[] = []
-      const overfullTables = tableStats.value
-        .filter(t => t.count > maxPerTable)
-        .sort((a, b) => b.count - a.count)
-
       const underfullTables = tableStats.value
         .filter(t => t.count < maxPerTable)
         .sort((a, b) => a.count - b.count)
 
-      let remaining = overflow
+      const remainingSpace = underfullTables.reduce((sum, t) => sum + (maxPerTable - t.count), 0)
+
+      let resolved = 0
+      const targetReduce = comparison.overflow || unassignedConfirmed.length
+
+      if (hasUnassigned && remainingSpace > 0) {
+        const unassignedList = [...unassignedConfirmed, ...unassignedPending]
+        for (const guest of unassignedList) {
+          if (resolved >= targetReduce) break
+          const underTable = underfullTables.find(t => t.count < maxPerTable)
+          if (underTable) {
+            steps.push({
+              type: 'redistribute',
+              description: `将未分桌宾客「${guest.name}」安排至${underTable.tableNumber}号桌（${underTable.count}/${maxPerTable}人）`,
+              guestId: guest.id,
+              guestName: guest.name,
+              toTable: underTable.tableNumber
+            })
+            underTable.count++
+            resolved++
+          } else {
+            break
+          }
+        }
+      }
 
       for (const overTable of overfullTables) {
+        if (resolved >= targetReduce) break
         const overCount = overTable.count - maxPerTable
         const moveable = overTable.guests.filter(g => g.status === 'pending')
 
-        for (let i = 0; i < Math.min(overCount, moveable.length) && remaining > 0; i++) {
+        for (let i = 0; i < Math.min(overCount, moveable.length) && resolved < targetReduce; i++) {
           const underTable = underfullTables.find(t => t.count < maxPerTable)
           if (underTable) {
             steps.push({
@@ -771,31 +877,9 @@ export const useGuestsStore = defineStore('guests', () => {
               toTable: underTable.tableNumber
             })
             underTable.count++
-            remaining--
+            resolved++
           } else {
             break
-          }
-        }
-      }
-
-      if (overfullTables.length > 0 && steps.length === 0) {
-        for (const overTable of overfullTables) {
-          const overCount = overTable.count - maxPerTable
-          const movable = overTable.guests.slice(maxPerTable)
-          for (let i = 0; i < Math.min(overCount, movable.length) && remaining > 0; i++) {
-            const underTable = underfullTables.find(t => t.count < maxPerTable)
-            if (underTable) {
-              steps.push({
-                type: 'redistribute',
-                description: `将${overTable.tableNumber}号桌宾客「${movable[i].name}」调至${underTable.tableNumber}号桌（${underTable.count}/${maxPerTable}人）`,
-                guestId: movable[i].id,
-                guestName: movable[i].name,
-                fromTable: overTable.tableNumber,
-                toTable: underTable.tableNumber
-              })
-              underTable.count++
-              remaining--
-            }
           }
         }
       }
@@ -803,10 +887,10 @@ export const useGuestsStore = defineStore('guests', () => {
       if (steps.length > 0) {
         plans.push({
           strategy: 'redistribute',
-          strategyDescription: `在各桌间重新分配宾客，平衡桌次人数`,
+          strategyDescription: '在各桌间重新分配宾客，平衡桌次人数，充分利用现有容量',
           steps,
-          resolvedOverflow: Math.min(overflow, steps.length),
-          remainingOverflow: Math.max(0, overflow - steps.length)
+          resolvedOverflow: steps.length,
+          remainingOverflow: Math.max(0, comparison.overflow - steps.length)
         })
       }
     }
@@ -864,6 +948,9 @@ export const useGuestsStore = defineStore('guests', () => {
     batchUpdateStatus,
     confirmedAttendanceCount,
     pendingAttendanceCount,
+    totalNonDeclinedCount,
+    confirmedUnassignedCount,
+    pendingUnassignedCount,
     capacityComparison,
     generateAdjustmentPlans,
     applyAdjustmentStep

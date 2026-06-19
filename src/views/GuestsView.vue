@@ -502,13 +502,23 @@ const getStrategyLabel = (strategy: string) => {
           </div>
 
           <div class="flex items-center justify-between text-xs text-gray-500 border-t border-gray-100 pt-2">
-            <span>已分配合计 <strong class="text-gray-700">{{ capacityComp.totalAssigned }}</strong> 人</span>
+            <span>宾客合计 <strong class="text-gray-700">{{ capacityComp.totalNonDeclined }}</strong> 人</span>
             <span v-if="capacityComp.overflow > 0" class="text-red-500 font-medium">
               超出 <strong>{{ capacityComp.overflow }}</strong> 人
             </span>
             <span v-else class="text-green-500 font-medium">
-              剩余 <strong>{{ capacityComp.venueCapacity - capacityComp.totalAssigned }}</strong> 席位
+              剩余 <strong>{{ capacityComp.venueCapacity - capacityComp.totalNonDeclined }}</strong> 席位
             </span>
+          </div>
+
+          <div v-if="guestsStore.confirmedUnassignedCount > 0" class="mt-2 p-2.5 bg-orange-50 rounded-xl border border-orange-100">
+            <div class="flex items-center gap-2">
+              <AlertTriangle class="w-4 h-4 text-orange-500 flex-shrink-0" />
+              <p class="text-xs text-orange-600">
+                <strong>{{ guestsStore.confirmedUnassignedCount }}</strong> 位已确认宾客尚未分桌
+                <span v-if="guestsStore.pendingUnassignedCount > 0">，另有{{ guestsStore.pendingUnassignedCount }}位待确认宾客待安排</span>
+              </p>
+            </div>
           </div>
 
           <button
@@ -518,6 +528,15 @@ const getStrategyLabel = (strategy: string) => {
           >
             <Sparkles class="w-4 h-4" />
             智能分桌调整方案
+          </button>
+
+          <button
+            v-else-if="guestsStore.confirmedUnassignedCount > 0"
+            @click="openAdjustmentModal"
+            class="mt-3 w-full py-2.5 bg-gradient-to-r from-orange-400 to-orange-500 text-white rounded-xl text-sm font-medium flex items-center justify-center gap-2 hover:shadow-lg transition-all duration-300"
+          >
+            <ArrowRightLeft class="w-4 h-4" />
+            为未分桌宾客安排席位
           </button>
 
           <button
@@ -1111,13 +1130,16 @@ const getStrategyLabel = (strategy: string) => {
 
           <div class="text-center mb-5">
             <div class="w-14 h-14 rounded-full flex items-center justify-center mx-auto mb-3"
-              :class="capacityComp.overflow > 0 ? 'bg-red-100' : 'bg-yellow-100'">
-              <Sparkles class="w-7 h-7" :class="capacityComp.overflow > 0 ? 'text-red-500' : 'text-yellow-500'" />
+              :class="capacityComp.overflow > 0 ? 'bg-red-100' : (guestsStore.confirmedUnassignedCount > 0 ? 'bg-orange-100' : 'bg-yellow-100')">
+              <Sparkles class="w-7 h-7" :class="capacityComp.overflow > 0 ? 'text-red-500' : (guestsStore.confirmedUnassignedCount > 0 ? 'text-orange-500' : 'text-yellow-500')" />
             </div>
             <h3 class="text-xl font-bold text-gray-800">智能分桌调整</h3>
             <p class="text-sm text-gray-500 mt-1">
               <template v-if="capacityComp.overflow > 0">
                 当前超出场地容量 <strong class="text-red-500">{{ capacityComp.overflow }}</strong> 人
+              </template>
+              <template v-else-if="guestsStore.confirmedUnassignedCount > 0">
+                <strong class="text-orange-500">{{ guestsStore.confirmedUnassignedCount }}</strong> 位已确认宾客待分桌
               </template>
               <template v-else>
                 当前利用率 {{ Math.round(capacityComp.utilizationRate * 100) }}%，可优化分桌
@@ -1138,10 +1160,14 @@ const getStrategyLabel = (strategy: string) => {
               <span class="text-gray-500">待确认出席</span>
               <span class="font-bold text-yellow-500">{{ capacityComp.pendingAttendance }}人</span>
             </div>
+            <div v-if="guestsStore.confirmedUnassignedCount > 0" class="flex items-center justify-between text-sm mt-1">
+              <span class="text-gray-500">已确认未分桌</span>
+              <span class="font-bold text-orange-500">{{ guestsStore.confirmedUnassignedCount }}人</span>
+            </div>
             <div class="flex items-center justify-between text-sm mt-1 pt-2 border-t border-gray-200">
-              <span class="text-gray-600 font-medium">已分配合计</span>
+              <span class="text-gray-600 font-medium">宾客合计</span>
               <span class="font-bold" :class="capacityComp.overflow > 0 ? 'text-red-500' : 'text-gray-800'">
-                {{ capacityComp.totalAssigned }}人
+                {{ capacityComp.totalNonDeclined }}人
               </span>
             </div>
           </div>
