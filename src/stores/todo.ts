@@ -9,7 +9,7 @@ import { useDressStore } from './dress'
 import { useRehearsalStore } from './rehearsal'
 import { useScheduleStore } from './schedule'
 import { useRoleStore } from './role'
-import { isModuleVisible, isBudgetVisible } from '@/data/permissions'
+import { isModuleVisible } from '@/data/permissions'
 
 export interface TodoCounts {
   overview: number
@@ -61,22 +61,14 @@ export const useTodoStore = defineStore('todo', () => {
     if (!isModuleVisible('budget', roleStore.currentRole)) {
       return 0
     }
-    const role = roleStore.currentRole
-    const visibleItems = budgetStore.items.filter(item => 
-      isBudgetVisible(item.category, role)
-    )
-    
     const todoSet = new Set<string>()
-    
-    visibleItems.forEach(item => {
+    budgetStore.items.forEach(item => {
       const isOverBudget = item.actual > (item.budget ?? item.planned)
       const isUnconfirmed = !item.confirmed
-      
       if (isOverBudget || isUnconfirmed) {
         todoSet.add(item.id)
       }
     })
-    
     return todoSet.size
   })
 
@@ -127,8 +119,16 @@ export const useTodoStore = defineStore('todo', () => {
     return unassignedItems.length
   })
 
+  const checklistTodoCount = computed(() => {
+    if (!isModuleVisible('overview', roleStore.currentRole)) {
+      return 0
+    }
+    return checklistStore.totalCount - checklistStore.completedCount
+  })
+
   const overviewTodoCount = computed(() => {
     return (
+      checklistTodoCount.value +
       guestsTodoCount.value +
       budgetTodoCount.value +
       venuesTodoCount.value +
@@ -164,6 +164,7 @@ export const useTodoStore = defineStore('todo', () => {
     dressTodoCount,
     rehearsalTodoCount,
     scheduleTodoCount,
+    checklistTodoCount,
     getTodoCount
   }
 })
