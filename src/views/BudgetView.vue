@@ -153,7 +153,7 @@ const goToCategory = (category: string) => {
   if (route) {
     router.push({
       path: route,
-      query: { drill: '1', from: 'budget' }
+      query: { drill: '1', from: 'budget', _t: String(Date.now()) }
     })
   }
 }

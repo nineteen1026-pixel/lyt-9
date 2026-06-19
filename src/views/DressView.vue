@@ -1,9 +1,9 @@
 <script setup lang="ts">
-import { ref, computed, onMounted, nextTick } from 'vue'
+import { ref, computed, onMounted, onBeforeUnmount, watch, nextTick } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { useDressStore, type Dress, type DressCategory } from '@/stores/dress'
 import { useBudgetStore } from '@/stores/budget'
-import { Shirt, Tag, Ruler, Calendar, Palette as DressPalette, Plus, Filter, ArrowUpDown, SlidersHorizontal, ArrowLeftRight } from 'lucide-vue-next'
+import { Shirt, Tag, Ruler, Calendar, Palette as DressPalette, Plus, Filter, ArrowUpDown, SlidersHorizontal, ArrowLeftRight, X } from 'lucide-vue-next'
 import OptionCard from '@/components/OptionCard.vue'
 import OptionFormModal from '@/components/OptionFormModal.vue'
 import CompareModal from '@/components/CompareModal.vue'
@@ -16,6 +16,8 @@ const dressStore = useDressStore()
 const budgetStore = useBudgetStore()
 
 const drillMode = ref(false)
+const contractedListRef = ref<HTMLElement | null>(null)
+let drillHighlightTimer: ReturnType<typeof setTimeout> | null = null
 
 const showFormModal = ref(false)
 const showCompareModal = ref(false)
@@ -234,35 +236,78 @@ const typeTabStyle = (type: DressCategory | 'all') =>
     ? 'bg-primary-500 text-white shadow-md'
     : 'bg-white text-gray-600 hover:bg-primary-50'
 
-onMounted(() => {
-  if (route.query.drill === '1') {
-    drillMode.value = true
-    filterStatus.value = 'contracted'
-    showFilter.value = true
-    const fromLabel = route.query.from === 'overview' ? '总览' : '预算'
-    const contractedList = dressStore.dresses.filter(d => d.contracted)
-    if (contractedList.length > 0) {
-      showToast(
-        '已自动定位已确认方案',
-        `来自${fromLabel}页饼图下钻 · 共 ${contractedList.length} 项已确认方案`,
-        'success',
-        3000
-      )
-    } else {
-      showToast(
-        '暂无已确认方案',
-        `来自${fromLabel}页饼图下钻 · 请先确认选型`,
-        'info',
-        3000
-      )
-    }
-    nextTick(() => {
-      setTimeout(() => {
-        drillMode.value = false
-      }, 3500)
-    })
+const clearDrillHighlight = () => {
+  if (drillHighlightTimer) {
+    clearTimeout(drillHighlightTimer)
+    drillHighlightTimer = null
   }
+  drillMode.value = false
+  document.removeEventListener('click', clearDrillHighlight)
+  document.removeEventListener('scroll', clearDrillHighlight)
+}
+
+const applyDrillDown = () => {
+  if (route.query.drill !== '1') return
+
+  clearDrillHighlight()
+  drillMode.value = true
+  filterStatus.value = 'contracted'
+  showFilter.value = true
+  activeTypeTab.value = 'all'
+
+  const fromLabel = route.query.from === 'overview' ? '总览' : '预算'
+  const contractedList = dressStore.dresses.filter(d => d.contracted)
+
+  if (contractedList.length > 0) {
+    showToast(
+      '已自动定位已确认方案',
+      `来自${fromLabel}页饼图下钻 · 共 ${contractedList.length} 项已确认方案`,
+      'success',
+      3500
+    )
+  } else {
+    showToast(
+      '暂无已确认方案',
+      `来自${fromLabel}页饼图下钻 · 请先确认选型`,
+      'info',
+      3500
+    )
+  }
+
+  nextTick(() => {
+    setTimeout(() => {
+      if (contractedListRef.value) {
+        contractedListRef.value.scrollIntoView({ behavior: 'smooth', block: 'start' })
+      } else {
+        window.scrollTo({ top: 200, behavior: 'smooth' })
+      }
+    }, 150)
+
+    setTimeout(() => {
+      document.addEventListener('click', clearDrillHighlight, { once: true })
+      document.addEventListener('scroll', clearDrillHighlight, { once: true })
+    }, 500)
+
+    drillHighlightTimer = setTimeout(() => {
+      clearDrillHighlight()
+    }, 12000)
+  })
+}
+
+onMounted(() => {
+  applyDrillDown()
 })
+
+onBeforeUnmount(() => {
+  clearDrillHighlight()
+})
+
+watch(
+  () => [route.query.drill, route.query._t],
+  () => {
+    applyDrillDown()
+  }
+)
 </script>
 
 <template>
@@ -413,7 +458,7 @@ onMounted(() => {
           </button>
         </div>
 
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div ref="contractedListRef" class="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div
             v-for="(dress, index) in sortedItems"
             :key="dress.id"

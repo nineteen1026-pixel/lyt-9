@@ -304,7 +304,7 @@ const handleLegendClick = (name: string) => {
   if (route) {
     router.push({
       path: route,
-      query: { drill: '1', from: 'overview' }
+      query: { drill: '1', from: 'overview', _t: String(Date.now()) }
     })
   }
 }
