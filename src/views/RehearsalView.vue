@@ -1,12 +1,15 @@
 <script setup lang="ts">
 import { ref, computed } from 'vue'
 import { useRehearsalStore } from '@/stores/rehearsal'
-import { Calendar, Clock, MapPin, Phone, Users, ChevronDown, ChevronUp, AlertCircle, Edit2, Check, X, Plus, Trash2 } from 'lucide-vue-next'
+import { useScheduleStore } from '@/stores/schedule'
+import { Calendar, Clock, MapPin, Phone, Users, ChevronDown, ChevronUp, AlertCircle, Edit2, Check, X, Plus, Trash2, Link2 } from 'lucide-vue-next'
 import type { StaffMember, RehearsalStep } from '@/data/mockData'
 import { storeToRefs } from 'pinia'
 
 const rehearsalStore = useRehearsalStore()
+const scheduleStore = useScheduleStore()
 const { staff } = storeToRefs(rehearsalStore)
+const { items: scheduleItems } = storeToRefs(scheduleStore)
 const expandedNotice = ref<string | null>('1')
 
 const editingStaffId = ref<string | null>(null)
@@ -18,9 +21,22 @@ const addStaffForm = ref({ name: '', role: '', phone: '' })
 const editingStepId = ref<string | null>(null)
 const editStepPersonId = ref<string>('')
 
+const editingStepLinkId = ref<string | null>(null)
+const editStepLinkedId = ref<string>('')
+
 const staffOptions = computed(() => {
   return staff.value.map(m => ({ id: m.id, name: m.name, role: m.role }))
 })
+
+const scheduleOptions = computed(() => {
+  return scheduleItems.value.map(item => ({ id: item.id, title: item.title, time: item.time }))
+})
+
+const getLinkedScheduleTitle = (linkedId?: string): string => {
+  if (!linkedId) return ''
+  const item = scheduleItems.value.find(i => i.id === linkedId)
+  return item ? `${item.time} ${item.title}` : ''
+}
 
 const toggleNotice = (id: string) => {
   expandedNotice.value = expandedNotice.value === id ? null : id
@@ -108,6 +124,26 @@ const saveEditStep = () => {
   }
   cancelEditStep()
 }
+
+const startEditStepLink = (step: RehearsalStep) => {
+  editingStepLinkId.value = step.id
+  editStepLinkedId.value = step.linkedScheduleItemId || ''
+}
+
+const cancelEditStepLink = () => {
+  editingStepLinkId.value = null
+  editStepLinkedId.value = ''
+}
+
+const saveEditStepLink = () => {
+  if (editingStepLinkId.value) {
+    rehearsalStore.updateStepLinkedScheduleItem(
+      editingStepLinkId.value,
+      editStepLinkedId.value || undefined
+    )
+  }
+  cancelEditStepLink()
+}
 </script>
 
 <template>
@@ -185,7 +221,7 @@ const saveEditStep = () => {
                   <h3 class="font-medium text-gray-800">{{ step.title }}</h3>
                 </div>
                 <p class="text-sm text-gray-500 mb-2">{{ step.description }}</p>
-                <div class="flex items-center gap-4 text-xs text-gray-400">
+                <div class="flex flex-wrap items-center gap-x-4 gap-y-2 text-xs text-gray-400">
                   <template v-if="editingStepId === step.id">
                     <div class="flex items-center gap-2">
                       <span class="text-gray-500">负责人:</span>
@@ -215,7 +251,38 @@ const saveEditStep = () => {
                       <Edit2 class="w-3 h-3" />
                     </button>
                   </template>
-                  <span v-if="step.notes">备注: {{ step.notes }}</span>
+                  <template v-if="editingStepLinkId === step.id">
+                    <div class="flex items-center gap-2">
+                      <Link2 class="w-3.5 h-3.5 text-morandi-purple" />
+                      <select
+                        v-model="editStepLinkedId"
+                        class="px-2 py-1 border border-morandi-purple/30 rounded-lg text-sm outline-none focus:ring-2 focus:ring-morandi-purple/30 bg-white"
+                      >
+                        <option value="">不关联</option>
+                        <option v-for="opt in scheduleOptions" :key="opt.id" :value="opt.id">
+                          {{ opt.time }} {{ opt.title }}
+                        </option>
+                      </select>
+                      <button @click="saveEditStepLink" class="p-1 text-morandi-green hover:bg-morandi-green/10 rounded">
+                        <Check class="w-4 h-4" />
+                      </button>
+                      <button @click="cancelEditStepLink" class="p-1 text-red-400 hover:bg-red-50 rounded">
+                        <X class="w-4 h-4" />
+                      </button>
+                    </div>
+                  </template>
+                  <template v-else>
+                    <button 
+                      @click="startEditStepLink(step)"
+                      class="flex items-center gap-1 hover:text-morandi-purple transition-colors"
+                      :class="step.linkedScheduleItemId ? 'text-morandi-purple' : 'text-gray-300'"
+                    >
+                      <Link2 class="w-3.5 h-3.5" />
+                      <span v-if="step.linkedScheduleItemId">关联: {{ getLinkedScheduleTitle(step.linkedScheduleItemId) }}</span>
+                      <span v-else>未关联流程</span>
+                    </button>
+                  </template>
+                  <span v-if="step.notes" class="text-gray-500">备注: {{ step.notes }}</span>
                 </div>
               </div>
             </div>
