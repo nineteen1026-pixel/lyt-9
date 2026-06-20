@@ -246,6 +246,60 @@ export const useRehearsalStore = defineStore('rehearsal', () => {
     return '工作人员'
   }
 
+  function reorderByLinkedScheduleItems(orderedScheduleIds: string[]) {
+    if (isSyncing) return
+    if (!orderedScheduleIds || orderedScheduleIds.length === 0) return
+
+    const scheduleOrderMap = new Map<string, number>()
+    orderedScheduleIds.forEach((id, idx) => scheduleOrderMap.set(id, idx))
+
+    const linkedSteps: RehearsalStep[] = []
+    const unlinkedSteps: RehearsalStep[] = []
+
+    steps.value.forEach(step => {
+      if (step.linkedScheduleItemId && scheduleOrderMap.has(step.linkedScheduleItemId)) {
+        linkedSteps.push(step)
+      } else {
+        unlinkedSteps.push(step)
+      }
+    })
+
+    linkedSteps.sort((a, b) => {
+      const orderA = scheduleOrderMap.get(a.linkedScheduleItemId!)!
+      const orderB = scheduleOrderMap.get(b.linkedScheduleItemId!)!
+      return orderA - orderB
+    })
+
+    unlinkedSteps.sort((a, b) => a.stepNumber - b.stepNumber)
+
+    const newSteps = [...linkedSteps, ...unlinkedSteps]
+    newSteps.forEach((step, idx) => {
+      step.stepNumber = idx + 1
+    })
+
+    steps.value = newSteps
+  }
+
+  function reorderSteps(orderedStepIds: string[]) {
+    if (!orderedStepIds || orderedStepIds.length === 0) return
+
+    const stepOrderMap = new Map<string, number>()
+    orderedStepIds.forEach((id, idx) => stepOrderMap.set(id, idx))
+
+    steps.value.sort((a, b) => {
+      const orderA = stepOrderMap.get(a.id)
+      const orderB = stepOrderMap.get(b.id)
+      if (orderA === undefined && orderB === undefined) return a.stepNumber - b.stepNumber
+      if (orderA === undefined) return 1
+      if (orderB === undefined) return -1
+      return orderA - orderB
+    })
+
+    steps.value.forEach((step, idx) => {
+      step.stepNumber = idx + 1
+    })
+  }
+
   return {
     steps,
     rehearsalInfo,
@@ -262,6 +316,8 @@ export const useRehearsalStore = defineStore('rehearsal', () => {
     getStaffNameById,
     updateStepPerson,
     updateStepLinkedScheduleItem,
-    syncFromSchedulePersonChange
+    syncFromSchedulePersonChange,
+    reorderByLinkedScheduleItems,
+    reorderSteps
   }
 })

@@ -98,6 +98,32 @@ export const useScheduleStore = defineStore('schedule', () => {
     isSyncing = value
   }
 
+  function reorderItems(orderedIds: string[]) {
+    if (!orderedIds || orderedIds.length === 0) return
+
+    const orderedMap = new Map<string, number>()
+    orderedIds.forEach((id, idx) => orderedMap.set(id, idx))
+
+    items.value.sort((a, b) => {
+      const idxA = orderedMap.get(a.id)
+      const idxB = orderedMap.get(b.id)
+      if (idxA === undefined && idxB === undefined) return a.time.localeCompare(b.time)
+      if (idxA === undefined) return 1
+      if (idxB === undefined) return -1
+      return idxA - idxB
+    })
+
+    if (!isSyncing) {
+      isSyncing = true
+      try {
+        const rehearsalStore = useRehearsalStore()
+        rehearsalStore.reorderByLinkedScheduleItems(orderedIds)
+      } finally {
+        isSyncing = false
+      }
+    }
+  }
+
   return {
     items,
     weddingDate,
@@ -107,6 +133,7 @@ export const useScheduleStore = defineStore('schedule', () => {
     deleteItem,
     getItemById,
     updateItemPerson,
-    setSyncing
+    setSyncing,
+    reorderItems
   }
 })

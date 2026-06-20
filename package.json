@@ -16,13 +16,16 @@
     "echarts": "^5.5.0",
     "lucide-vue-next": "^0.511.0",
     "pinia": "^2.1.7",
+    "sortablejs": "^1.15.7",
     "tailwind-merge": "^3.3.0",
     "vue": "^3.4.15",
     "vue-router": "^4.2.5",
+    "vuedraggable": "^4.1.0",
     "xlsx": "^0.18.5"
   },
   "devDependencies": {
     "@types/node": "^22.15.30",
+    "@types/sortablejs": "^1.15.9",
     "@typescript-eslint/eslint-plugin": "^7.0.1",
     "@typescript-eslint/parser": "^7.0.1",
     "@vitejs/plugin-vue": "^5.0.3",

@@ -66,6 +66,10 @@ const handleDateChange = (e: Event) => {
 const handlePersonInChargeUpdate = (id: string, personId: string | undefined, personName: string) => {
   scheduleStore.updateItemPerson(id, personId, personName)
 }
+
+const handleOrderUpdate = (orderedIds: string[]) => {
+  scheduleStore.reorderItems(orderedIds)
+}
 </script>
 
 <template>
@@ -101,15 +105,23 @@ const handlePersonInChargeUpdate = (id: string, personId: string | undefined, pe
           />
         </div>
 
-        <div class="mb-4 text-xs text-primary-400 text-right">
-          点击负责人可编辑
+        <div class="mb-4 text-xs text-primary-400 text-right flex items-center justify-end gap-4">
+          <span class="flex items-center gap-1">
+            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 8h16M4 16h16" />
+            </svg>
+            悬停显示拖拽手柄，可调整顺序
+          </span>
+          <span>点击负责人可编辑</span>
         </div>
 
         <Timeline
           :items="flatTimeline"
           :editable="true"
+          :draggable="true"
           :staff-options="staffOptions"
           @update:person-in-charge="handlePersonInChargeUpdate"
+          @update:order="handleOrderUpdate"
         />
       </div>
     </div>
