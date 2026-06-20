@@ -55,6 +55,16 @@ const handleAccessDenied = (event: Event) => {
 }
 
 onMounted(() => {
+  if (typeof window !== 'undefined') {
+    const cacheVersion = localStorage.getItem('cache-version')
+    const currentVersion = '1.0.1'
+    if (cacheVersion !== currentVersion) {
+      localStorage.removeItem('wedding-venues')
+      localStorage.removeItem('wedding-photography')
+      localStorage.removeItem('wedding-emergency-contacts')
+      localStorage.setItem('cache-version', currentVersion)
+    }
+  }
   budgetStore.syncContractedToBudget()
   if (typeof window !== 'undefined') {
     window.addEventListener('route-access-denied', handleAccessDenied)

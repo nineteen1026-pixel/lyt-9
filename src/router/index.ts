@@ -7,6 +7,7 @@ import PhotographyView from '@/views/PhotographyView.vue'
 import DressView from '@/views/DressView.vue'
 import ScheduleView from '@/views/ScheduleView.vue'
 import RehearsalView from '@/views/RehearsalView.vue'
+import EmergencyContactsView from '@/views/EmergencyContactsView.vue'
 import { isModuleVisible, getModulePermission } from '@/data/permissions'
 import { useRoleStore } from '@/stores/role'
 
@@ -62,6 +63,12 @@ const routes = [
     name: 'rehearsal',
     component: RehearsalView,
     meta: { moduleId: 'rehearsal' }
+  },
+  {
+    path: '/emergency-contacts',
+    name: 'emergency-contacts',
+    component: EmergencyContactsView,
+    meta: { moduleId: 'emergency-contacts' }
   }
 ]
 

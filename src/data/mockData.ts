@@ -169,6 +169,18 @@ export interface Notice {
   content: string
 }
 
+export type EmergencyContactCategory = 'guest' | 'vendor' | 'staff' | 'custom'
+
+export interface EmergencyContact {
+  id: string
+  name: string
+  phone: string
+  category: EmergencyContactCategory
+  role: string
+  remark: string
+  sourceId?: string
+}
+
 export const mockBudget: BudgetItem[] = [
   { id: '1', category: '场地', planned: 50000, actual: 48000, color: '#FF6B6B', budget: 50000, locked: true, confirmed: true },
   { id: '2', category: '餐饮', planned: 80000, actual: 78000, color: '#4ECDC4', budget: 80000, confirmed: false },
@@ -217,7 +229,7 @@ export const mockVenues: Venue[] = [
 ]
 
 export const mockPhotography: Photography[] = [
-  { id: '1', teamName: '光影纪摄影工作室', style: '清新自然', packageType: '全天跟拍', price: 12800, shootDate: '2024-10-01', contracted: true, contractPrice: 12800, pros: ['拍摄风格自然', '团队经验丰富', '修片速度快', '沟通顺畅'], cons: ['热门档期需提前预约'], rating: 4.7, notes: '首席摄影师李明，需付定金30%', createdAt: Date.now() - 86400000 * 10 },
+  { id: '1', teamName: '光影纪摄影工作室', style: '清新自然', packageType: '全天跟拍', price: 12800, shootDate: '2024-10-01', contracted: true, contractPrice: 12800, pros: ['拍摄风格自然', '团队经验丰富', '修片速度快', '沟通顺畅'], cons: ['热门档期需提前预约'], rating: 4.7, notes: '首席摄影师李明，电话139xxxx9999，需付定金30%', createdAt: Date.now() - 86400000 * 10 },
   { id: '2', teamName: '时光影像', style: '复古胶片', packageType: '半天跟拍', price: 6800, shootDate: '2024-09-28', contracted: false, contractPrice: 0, pros: ['价格实惠', '胶片质感独特', '送花絮视频'], cons: ['只有半天时间', '不含航拍'], rating: 4.3, notes: '适合预算有限的新人', createdAt: Date.now() - 86400000 * 6 },
   { id: '3', teamName: '唯爱摄影', style: '韩式唯美', packageType: '旅拍套餐', price: 18800, shootDate: '2024-09-15', contracted: false, contractPrice: 0, pros: ['旅拍套餐超值', '韩式妆容精致', '多套服装造型', '底片全送'], cons: ['需出差两天', '价格较高'], rating: 4.9, notes: '包含三亚两天旅拍，食宿全包', createdAt: Date.now() - 86400000 * 4 }
 ]
@@ -339,4 +351,13 @@ export const mockNotices: Notice[] = [
   { id: '2', title: '请提前准备好仪式所需物品', content: '包括：戒指、誓言卡、敬茶茶具、捧花等。请将这些物品交给专人保管，彩排当天带来。' },
   { id: '3', title: '提醒双方父母准时参加', content: '彩排需要双方父母配合敬茶环节，请务必提醒他们准时到达。如有特殊情况请提前告知司仪。' },
   { id: '4', title: '彩排后确认最终流程', content: '彩排结束后，我们会有15分钟的沟通时间，确认最终的婚礼流程和细节调整，请新人预留时间。' }
+]
+
+export const mockEmergencyContacts: EmergencyContact[] = [
+  { id: 'ec1', name: '花园酒店前台', phone: '010-88888888', category: 'vendor', role: '场地', remark: '已签约场地' },
+  { id: 'ec2', name: '光影纪摄影', phone: '13800138001', category: 'vendor', role: '摄影', remark: '已签约摄影团队' },
+  { id: 'ec3', name: '婚车队长', phone: '13900139001', category: 'custom', role: '婚车', remark: '6辆婚车，提前确认路线' },
+  { id: 'ec4', name: '花艺师', phone: '13700137001', category: 'custom', role: '花艺', remark: '手捧花+现场花艺布置' },
+  { id: 'ec5', name: '伴郎张伟', phone: '13800138001', category: 'guest', role: '伴郎', remark: '新郎大学室友' },
+  { id: 'ec6', name: '伴娘李娜', phone: '13800138002', category: 'guest', role: '伴娘', remark: '新娘闺蜜' }
 ]

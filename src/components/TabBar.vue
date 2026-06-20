@@ -54,7 +54,8 @@ import {
   Camera,
   Shirt,
   Calendar,
-  ListChecks
+  ListChecks,
+  Phone
 } from 'lucide-vue-next'
 
 const route = useRoute()
@@ -74,7 +75,8 @@ const allTabs = [
   { path: '/photography', label: '摄影', icon: Camera, id: 'photography' },
   { path: '/dress', label: '婚纱', icon: Shirt, id: 'dress' },
   { path: '/schedule', label: '流程', icon: Calendar, id: 'schedule' },
-  { path: '/rehearsal', label: '彩排', icon: ListChecks, id: 'rehearsal' }
+  { path: '/rehearsal', label: '彩排', icon: ListChecks, id: 'rehearsal' },
+  { path: '/emergency-contacts', label: '通讯录', icon: Phone, id: 'emergency-contacts' }
 ]
 
 const tabs = computed(() => 

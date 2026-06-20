@@ -66,6 +66,13 @@ export const modulePermissions: ModulePermission[] = [
     path: '/rehearsal',
     visibility: 'both',
     description: '婚礼彩排安排，双方共同参与'
+  },
+  {
+    id: 'emergency-contacts',
+    name: '应急通讯录',
+    path: '/emergency-contacts',
+    visibility: 'both',
+    description: '婚礼日应急通讯录，聚合所有联系人并支持一键拨号'
   }
 ]
 
