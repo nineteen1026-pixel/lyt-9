@@ -67,10 +67,7 @@
                       class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium"
                       :class="getShotProgressClass(element.id)"
                     >
-                      <svg class="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
-                      </svg>
+                      <Camera class="w-3 h-3 mr-1" />
                       {{ getShotStats(element.id).completed }}/{{ getShotStats(element.id).total }}
                     </span>
                   </template>
@@ -154,10 +151,7 @@
                       @click="toggleShotList(element.id!)"
                       class="flex items-center gap-2 text-sm font-medium text-gray-700 hover:text-primary-500 transition-colors"
                     >
-                      <svg class="w-4 h-4 text-champagne-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
-                      </svg>
+                      <Camera class="w-4 h-4 text-champagne-400" />
                       <span>拍摄任务清单</span>
                       <span class="text-xs text-gray-400">({{ getShotStats(element.id).completed }}/{{ getShotStats(element.id).total }})</span>
                       <component 
@@ -165,12 +159,22 @@
                         class="w-4 h-4 text-gray-400 transition-transform"
                       />
                     </button>
-                    <div class="w-24 h-1.5 bg-gray-100 rounded-full overflow-hidden">
-                      <div 
-                        class="h-full rounded-full transition-all duration-500"
-                        :class="getShotProgressBgClass(element.id)"
-                        :style="{ width: `${getShotStats(element.id).percent}%` }"
-                      ></div>
+                    <div class="flex items-center gap-3">
+                      <div class="w-24 h-1.5 bg-gray-100 rounded-full overflow-hidden">
+                        <div 
+                          class="h-full rounded-full transition-all duration-500"
+                          :class="getShotProgressBgClass(element.id)"
+                          :style="{ width: `${getShotStats(element.id).percent}%` }"
+                        ></div>
+                      </div>
+                      <button
+                        v-if="editable"
+                        @click="startAddShot(element.id!)"
+                        class="p-1 text-primary-400 hover:text-primary-600 hover:bg-primary-50 rounded transition-colors"
+                        title="添加拍摄任务"
+                      >
+                        <Plus class="w-4 h-4" />
+                      </button>
                     </div>
                   </div>
 
@@ -181,7 +185,7 @@
                     <div
                       v-for="shot in getShots(element.id!)"
                       :key="shot.id"
-                      class="flex items-start gap-3 p-2.5 rounded-lg transition-all duration-200"
+                      class="flex items-start gap-3 p-2.5 rounded-lg transition-all duration-200 group/shot"
                       :class="shot.completed ? 'bg-green-50' : 'bg-gray-50 hover:bg-champagne-50/50'"
                     >
                       <button
@@ -196,32 +200,124 @@
                         </svg>
                       </button>
                       <div class="flex-1 min-w-0">
-                        <div class="flex items-center gap-2">
+                        <template v-if="editingShotId === shot.id">
+                          <div class="space-y-2">
+                            <input
+                              v-model="editShotForm.title"
+                              type="text"
+                              placeholder="任务名称"
+                              class="w-full px-2 py-1 text-sm border border-primary-200 rounded-lg outline-none focus:ring-2 focus:ring-primary-300 bg-white"
+                            />
+                            <input
+                              v-model="editShotForm.description"
+                              type="text"
+                              placeholder="描述（可选）"
+                              class="w-full px-2 py-1 text-xs border border-primary-200 rounded-lg outline-none focus:ring-2 focus:ring-primary-300 bg-white"
+                            />
+                            <div class="flex items-center gap-2">
+                              <select
+                                v-model="editShotForm.priority"
+                                class="px-2 py-1 text-xs border border-primary-200 rounded-lg outline-none focus:ring-2 focus:ring-primary-300 bg-white"
+                              >
+                                <option value="essential">必拍</option>
+                                <option value="important">重要</option>
+                                <option value="optional">可选</option>
+                              </select>
+                              <button @click="saveEditShot(shot)" class="p-1 text-green-500 hover:bg-green-50 rounded">
+                                <Check class="w-4 h-4" />
+                              </button>
+                              <button @click="cancelEditShot" class="p-1 text-gray-400 hover:text-red-500 rounded">
+                                <X class="w-4 h-4" />
+                              </button>
+                            </div>
+                          </div>
+                        </template>
+                        <template v-else>
+                          <div class="flex items-center gap-2">
+                            <p 
+                              class="text-sm font-medium transition-all duration-200"
+                              :class="shot.completed ? 'text-gray-400 line-through' : 'text-gray-800'"
+                            >
+                              {{ shot.title }}
+                            </p>
+                            <span 
+                              class="inline-flex px-1.5 py-0.5 rounded text-[10px] font-medium"
+                              :class="getPriorityClass(shot.priority)"
+                            >
+                              {{ getPriorityLabel(shot.priority) }}
+                            </span>
+                            <div v-if="editable" class="flex items-center gap-0.5 opacity-0 group-hover/shot:opacity-100 transition-opacity">
+                              <button
+                                @click="startEditShot(shot)"
+                                class="p-0.5 text-gray-400 hover:text-primary-500 rounded"
+                                title="编辑"
+                              >
+                                <Edit2 class="w-3 h-3" />
+                              </button>
+                              <button
+                                @click="handleDeleteShot(shot.id)"
+                                class="p-0.5 text-gray-400 hover:text-red-500 rounded"
+                                title="删除"
+                              >
+                                <Trash2 class="w-3 h-3" />
+                              </button>
+                            </div>
+                          </div>
                           <p 
-                            class="text-sm font-medium transition-all duration-200"
-                            :class="shot.completed ? 'text-gray-400 line-through' : 'text-gray-800'"
+                            v-if="shot.description" 
+                            class="text-xs mt-0.5 transition-all duration-200"
+                            :class="shot.completed ? 'text-gray-300' : 'text-gray-500'"
                           >
-                            {{ shot.title }}
+                            {{ shot.description }}
                           </p>
-                          <span 
-                            class="inline-flex px-1.5 py-0.5 rounded text-[10px] font-medium"
-                            :class="getPriorityClass(shot.priority)"
-                          >
-                            {{ getPriorityLabel(shot.priority) }}
-                          </span>
-                        </div>
-                        <p 
-                          v-if="shot.description" 
-                          class="text-xs mt-0.5 transition-all duration-200"
-                          :class="shot.completed ? 'text-gray-300' : 'text-gray-500'"
-                        >
-                          {{ shot.description }}
-                        </p>
+                        </template>
                       </div>
                     </div>
 
-                    <div v-if="getShots(element.id!).length === 0" class="text-center py-4 text-xs text-gray-400">
-                      暂无拍摄任务
+                    <div v-if="addingShotForId === element.id" class="p-3 bg-primary-50/50 rounded-lg border border-primary-100">
+                      <div class="space-y-2">
+                        <input
+                          v-model="addShotForm.title"
+                          type="text"
+                          placeholder="任务名称 *"
+                          class="w-full px-2 py-1.5 text-sm border border-primary-200 rounded-lg outline-none focus:ring-2 focus:ring-primary-300 bg-white"
+                          @keyup.enter="saveAddShot(element.id!)"
+                        />
+                        <input
+                          v-model="addShotForm.description"
+                          type="text"
+                          placeholder="描述（可选）"
+                          class="w-full px-2 py-1.5 text-xs border border-primary-200 rounded-lg outline-none focus:ring-2 focus:ring-primary-300 bg-white"
+                          @keyup.enter="saveAddShot(element.id!)"
+                        />
+                        <div class="flex items-center justify-between">
+                          <select
+                            v-model="addShotForm.priority"
+                            class="px-2 py-1 text-xs border border-primary-200 rounded-lg outline-none focus:ring-2 focus:ring-primary-300 bg-white"
+                          >
+                            <option value="essential">必拍</option>
+                            <option value="important">重要</option>
+                            <option value="optional">可选</option>
+                          </select>
+                          <div class="flex items-center gap-2">
+                            <button @click="cancelAddShot" class="px-3 py-1 text-xs text-gray-500 hover:bg-gray-100 rounded-lg transition-colors">
+                              取消
+                            </button>
+                            <button
+                              @click="saveAddShot(element.id!)"
+                              :disabled="!addShotForm.title.trim()"
+                              class="px-3 py-1 text-xs bg-primary-500 text-white rounded-lg hover:bg-primary-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                            >
+                              添加
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div v-if="getShots(element.id!).length === 0 && addingShotForId !== element.id" class="text-center py-3 text-xs text-gray-400">
+                      暂无拍摄任务，
+                      <button @click="startAddShot(element.id!)" class="text-primary-400 hover:text-primary-600 underline">点击添加</button>
                     </div>
                   </div>
                 </div>
@@ -238,7 +334,7 @@
 import { ref, onMounted, onUnmounted, nextTick, watch, computed } from 'vue'
 import draggable from 'vuedraggable'
 import { useRoute, useRouter } from 'vue-router'
-import { ChevronDown, ChevronUp } from 'lucide-vue-next'
+import { ChevronDown, ChevronUp, Camera, Plus, Edit2, Trash2, Check, X } from 'lucide-vue-next'
 import { usePhotoShotsStore, type PhotoShot } from '@/stores/photoShots'
 
 type SeparatorItem = { type: 'separator'; label: string }
@@ -280,6 +376,75 @@ const emit = defineEmits<{
 const photoShotsStore = usePhotoShotsStore()
 const shotEnabled = computed(() => props.showPhotoShots)
 const expandedShotLists = ref<string[]>([])
+
+const editingShotId = ref<string | null>(null)
+const editShotForm = ref<{ title: string; description: string; priority: PhotoShot['priority'] }>({
+  title: '',
+  description: '',
+  priority: 'important'
+})
+
+const addingShotForId = ref<string | null>(null)
+const addShotForm = ref<{ title: string; description: string; priority: PhotoShot['priority'] }>({
+  title: '',
+  description: '',
+  priority: 'important'
+})
+
+function startEditShot(shot: PhotoShot) {
+  editingShotId.value = shot.id
+  editShotForm.value = {
+    title: shot.title,
+    description: shot.description,
+    priority: shot.priority
+  }
+}
+
+function cancelEditShot() {
+  editingShotId.value = null
+  editShotForm.value = { title: '', description: '', priority: 'important' }
+}
+
+function saveEditShot(shot: PhotoShot) {
+  if (!editShotForm.value.title.trim()) return
+  photoShotsStore.updateShot(shot.id, {
+    title: editShotForm.value.title.trim(),
+    description: editShotForm.value.description.trim(),
+    priority: editShotForm.value.priority
+  })
+  cancelEditShot()
+}
+
+function handleDeleteShot(shotId: string) {
+  photoShotsStore.deleteShot(shotId)
+}
+
+function startAddShot(scheduleItemId: string) {
+  addingShotForId.value = scheduleItemId
+  addShotForm.value = { title: '', description: '', priority: 'important' }
+  if (!expandedShotLists.value.includes(scheduleItemId)) {
+    expandedShotLists.value.push(scheduleItemId)
+  }
+}
+
+function cancelAddShot() {
+  addingShotForId.value = null
+  addShotForm.value = { title: '', description: '', priority: 'important' }
+}
+
+function saveAddShot(scheduleItemId: string) {
+  if (!addShotForm.value.title.trim()) return
+  const existingShots = photoShotsStore.getShotsByScheduleItem(scheduleItemId)
+  photoShotsStore.addShot({
+    scheduleItemId,
+    title: addShotForm.value.title.trim(),
+    description: addShotForm.value.description.trim(),
+    completed: false,
+    order: existingShots.length + 1,
+    priority: addShotForm.value.priority
+  })
+  cancelAddShot()
+}
 
 function toggleShotList(scheduleItemId: string) {
   const idx = expandedShotLists.value.indexOf(scheduleItemId)
@@ -369,6 +534,12 @@ const buildLocalItems = (items: TimelineItem[]): TimelineItemWithKey[] => {
 watch(() => props.items, (newItems) => {
   localItems.value = buildLocalItems(newItems)
   visibleItems.value = newItems.map(() => false)
+  if (props.showPhotoShots) {
+    const idsWithShots = newItems
+      .filter(item => isEvent(item) && item.id && photoShotsStore.getShotsByScheduleItem(item.id).length > 0)
+      .map(item => (item as EventItem).id!)
+    expandedShotLists.value = idsWithShots
+  }
   nextTick(() => {
     newItems.forEach((_, i) => {
       setTimeout(() => {

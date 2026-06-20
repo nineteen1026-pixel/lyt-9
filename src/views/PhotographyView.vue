@@ -4,7 +4,9 @@ import { useRouter, useRoute } from 'vue-router'
 import { usePhotographyStore, type Photography } from '@/stores/photography'
 import { useBudgetStore } from '@/stores/budget'
 import { useRoleStore } from '@/stores/role'
-import { Camera, Calendar, Palette, Plus, Filter, ArrowUpDown, SlidersHorizontal, ArrowLeftRight, Check, X } from 'lucide-vue-next'
+import { useScheduleStore } from '@/stores/schedule'
+import { usePhotoShotsStore } from '@/stores/photoShots'
+import { Camera, Calendar, Palette, Plus, Filter, ArrowUpDown, SlidersHorizontal, ArrowLeftRight, Check, X, ListChecks } from 'lucide-vue-next'
 import OptionCard from '@/components/OptionCard.vue'
 import OptionFormModal from '@/components/OptionFormModal.vue'
 import CompareModal from '@/components/CompareModal.vue'
@@ -17,6 +19,20 @@ const route = useRoute()
 const photographyStore = usePhotographyStore()
 const budgetStore = useBudgetStore()
 const roleStore = useRoleStore()
+const scheduleStore = useScheduleStore()
+const photoShotsStore = usePhotoShotsStore()
+
+const navigateToScheduleShotList = (scheduleItemId: string) => {
+  router.push({ path: '/schedule', query: { highlight: scheduleItemId } })
+}
+
+const scheduleItemsWithShots = computed(() => {
+  return scheduleStore.items.map(item => ({
+    ...item,
+    shotCount: photoShotsStore.getShotsByScheduleItem(item.id).length,
+    shotStats: photoShotsStore.getStatsByScheduleItem(item.id)
+  }))
+})
 
 const drillMode = ref(false)
 const contractedListRef = ref<HTMLElement | null>(null)
@@ -539,6 +555,55 @@ const getAvatarColor = (name: string) => {
                     <Check class="w-2.5 h-2.5 text-green-500" />
                   </div>
                   <span class="text-xs text-gray-600">{{ extra }}</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="animate-slide-up" style="animation-delay: 0.7s">
+          <h2 class="text-lg font-bold text-gray-800 mb-4">流程拍摄清单</h2>
+          <div v-if="scheduleItemsWithShots.length === 0" class="bg-white rounded-2xl p-8 text-center shadow-md">
+            <ListChecks class="w-10 h-10 text-gray-300 mx-auto mb-3" />
+            <p class="text-sm text-gray-500">暂无流程节点，请先在流程页添加</p>
+          </div>
+          <div v-else class="space-y-2">
+            <div
+              v-for="(item, index) in scheduleItemsWithShots"
+              :key="item.id"
+              class="bg-white rounded-xl p-4 shadow-sm hover:shadow-md transition-all duration-300 cursor-pointer"
+              @click="navigateToScheduleShotList(item.id)"
+            >
+              <div class="flex items-center justify-between">
+                <div class="flex items-center gap-3">
+                  <div class="w-9 h-9 rounded-lg flex items-center justify-center"
+                    :class="item.shotCount > 0 ? 'bg-champagne-100' : 'bg-gray-100'"
+                  >
+                    <Camera class="w-4 h-4" :class="item.shotCount > 0 ? 'text-champagne-500' : 'text-gray-400'" />
+                  </div>
+                  <div>
+                    <p class="text-sm font-medium text-gray-800">{{ item.title }}</p>
+                    <p class="text-xs text-gray-400">{{ item.time }}</p>
+                  </div>
+                </div>
+                <div class="flex items-center gap-3">
+                  <div class="text-right">
+                    <p class="text-xs text-gray-500">
+                      <span :class="item.shotStats.percent === 100 && item.shotCount > 0 ? 'text-green-500 font-medium' : ''">
+                        {{ item.shotStats.completed }}/{{ item.shotStats.total }}
+                      </span>
+                    </p>
+                    <div v-if="item.shotCount > 0" class="w-16 h-1 bg-gray-100 rounded-full mt-1">
+                      <div 
+                        class="h-full rounded-full transition-all duration-500"
+                        :class="item.shotStats.percent === 100 ? 'bg-green-500' : item.shotStats.percent >= 50 ? 'bg-champagne-400' : 'bg-primary-400'"
+                        :style="{ width: `${item.shotStats.percent}%` }"
+                      ></div>
+                    </div>
+                  </div>
+                  <svg class="w-4 h-4 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
+                  </svg>
                 </div>
               </div>
             </div>

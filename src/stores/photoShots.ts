@@ -58,6 +58,10 @@ export const usePhotoShotsStore = defineStore('photoShots', () => {
     }
   }
 
+  const deleteShotsByScheduleItem = (scheduleItemId: string) => {
+    shots.value = shots.value.filter(s => s.scheduleItemId !== scheduleItemId)
+  }
+
   const reorderShots = (scheduleItemId: string, orderedIds: string[]) => {
     orderedIds.forEach((id, idx) => {
       const shot = shots.value.find(s => s.id === id)
@@ -96,6 +100,7 @@ export const usePhotoShotsStore = defineStore('photoShots', () => {
     addShot,
     updateShot,
     deleteShot,
+    deleteShotsByScheduleItem,
     reorderShots,
     totalStats,
     getShotById,

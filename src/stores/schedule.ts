@@ -3,6 +3,7 @@ import { ref, watch } from 'vue'
 import { get, set } from '../utils/storage'
 import { mockSchedule, mockWeddingDate, type ScheduleItem } from '../data/mockData'
 import { useRehearsalStore } from './rehearsal'
+import { usePhotoShotsStore } from './photoShots'
 
 export { type ScheduleItem }
 
@@ -84,6 +85,8 @@ export const useScheduleStore = defineStore('schedule', () => {
     const index = items.value.findIndex(item => item.id === id)
     if (index !== -1) {
       items.value.splice(index, 1)
+      const photoShotsStore = usePhotoShotsStore()
+      photoShotsStore.deleteShotsByScheduleItem(id)
     }
   }
 
