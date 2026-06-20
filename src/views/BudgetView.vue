@@ -10,7 +10,7 @@ import { useRoleStore } from '@/stores/role'
 import PieChart from '@/components/PieChart.vue'
 import Toast from '@/components/Toast.vue'
 import RoleSwitcher from '@/components/RoleSwitcher.vue'
-import { Wallet, TrendingDown, TrendingUp, Target, AlertTriangle, Info, Lock, MapPin, Camera, Shirt, ExternalLink, CheckCircle, CheckCircle2, Check, RefreshCw, ChevronDown, ChevronUp, Users, Heart } from 'lucide-vue-next'
+import { Wallet, TrendingDown, TrendingUp, Target, AlertTriangle, Info, Lock, MapPin, Camera, Shirt, ExternalLink, CheckCircle, CheckCircle2, Check, RefreshCw, ChevronDown, ChevronUp, Users, Heart, FileText } from 'lucide-vue-next'
 import { useChecklistStore } from '@/stores/checklist'
 import { isBudgetVisible, getBudgetOwner } from '@/data/permissions'
 
@@ -207,13 +207,20 @@ const getOwnerClass = (category: string) => {
             <RoleSwitcher />
           </div>
 
-          <div class="flex items-center justify-center">
+          <div class="flex items-center justify-center gap-3">
             <button
               @click="handleSync"
               class="py-2 px-4 bg-white/20 backdrop-blur-sm text-white rounded-xl text-sm font-medium flex items-center gap-1.5 hover:bg-white/30 transition-colors"
             >
               <RefreshCw class="w-4 h-4" />
               同步选型金额
+            </button>
+            <button
+              @click="router.push('/expense-change-log')"
+              class="py-2 px-4 bg-white/20 backdrop-blur-sm text-white rounded-xl text-sm font-medium flex items-center gap-1.5 hover:bg-white/30 transition-colors"
+            >
+              <FileText class="w-4 h-4" />
+              费用变动流水
             </button>
           </div>
         </div>

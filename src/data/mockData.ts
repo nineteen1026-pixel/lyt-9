@@ -1,3 +1,18 @@
+export type ExpenseChangeType = 'add' | 'update' | 'sync'
+
+export interface ExpenseChangeLog {
+  id: string
+  category: string
+  changeType: ExpenseChangeType
+  sourceModule: string
+  description: string
+  oldAmount: number
+  newAmount: number
+  difference: number
+  operator: string
+  timestamp: number
+}
+
 export interface BudgetItem {
   id: string
   category: string
@@ -359,4 +374,13 @@ export const mockEmergencyContacts: EmergencyContact[] = [
   { id: 'ec3', name: '甜品师', phone: '13600136001', category: 'custom', role: '甜品', remark: '婚礼蛋糕+甜品台' },
   { id: 'ec4', name: '灯光师', phone: '13500135001', category: 'custom', role: '灯光', remark: '仪式灯光+追光灯' },
   { id: 'ec5', name: '音响师', phone: '13400134001', category: 'custom', role: '音响', remark: '全场音响+背景音乐' }
+]
+
+export const mockExpenseChangeLogs: ExpenseChangeLog[] = [
+  { id: 'ecl1', category: '场地', changeType: 'sync', sourceModule: '场地', description: '同步选型金额：花园酒店宴会厅已签约', oldAmount: 0, newAmount: 48000, difference: 48000, operator: '系统同步', timestamp: Date.now() - 86400000 * 10 },
+  { id: 'ecl2', category: '摄影', changeType: 'sync', sourceModule: '摄影', description: '同步选型金额：光影纪摄影工作室已签约', oldAmount: 0, newAmount: 12800, difference: 12800, operator: '系统同步', timestamp: Date.now() - 86400000 * 10 },
+  { id: 'ecl3', category: '婚纱', changeType: 'sync', sourceModule: '婚纱', description: '同步选型金额：维多利亚女王+简约优雅+东方佳人已签约', oldAmount: 0, newAmount: 16800, difference: 16800, operator: '系统同步', timestamp: Date.now() - 86400000 * 10 },
+  { id: 'ecl4', category: '场地', changeType: 'update', sourceModule: '预算', description: '场地预算手动调整', oldAmount: 48000, newAmount: 48000, difference: 0, operator: '新郎', timestamp: Date.now() - 86400000 * 5 },
+  { id: 'ecl5', category: '餐饮', changeType: 'update', sourceModule: '预算', description: '餐饮实际支出调整', oldAmount: 75000, newAmount: 78000, difference: 3000, operator: '新娘', timestamp: Date.now() - 86400000 * 3 },
+  { id: 'ecl6', category: '婚纱', changeType: 'sync', sourceModule: '婚纱', description: '重新同步婚纱选型金额', oldAmount: 16800, newAmount: 16800, difference: 0, operator: '系统同步', timestamp: Date.now() - 86400000 * 1 }
 ]

@@ -8,6 +8,7 @@ import DressView from '@/views/DressView.vue'
 import ScheduleView from '@/views/ScheduleView.vue'
 import RehearsalView from '@/views/RehearsalView.vue'
 import EmergencyContactsView from '@/views/EmergencyContactsView.vue'
+import ExpenseChangeLogView from '@/views/ExpenseChangeLogView.vue'
 import { isModuleVisible, getModulePermission } from '@/data/permissions'
 import { useRoleStore } from '@/stores/role'
 
@@ -69,6 +70,12 @@ const routes = [
     name: 'emergency-contacts',
     component: EmergencyContactsView,
     meta: { moduleId: 'emergency-contacts' }
+  },
+  {
+    path: '/expense-change-log',
+    name: 'expense-change-log',
+    component: ExpenseChangeLogView,
+    meta: { moduleId: 'budget' }
   }
 ]
 
