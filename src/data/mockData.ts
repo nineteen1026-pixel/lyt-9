@@ -354,10 +354,9 @@ export const mockNotices: Notice[] = [
 ]
 
 export const mockEmergencyContacts: EmergencyContact[] = [
-  { id: 'ec1', name: '花园酒店前台', phone: '010-88888888', category: 'vendor', role: '场地', remark: '已签约场地' },
-  { id: 'ec2', name: '光影纪摄影', phone: '13800138001', category: 'vendor', role: '摄影', remark: '已签约摄影团队' },
-  { id: 'ec3', name: '婚车队长', phone: '13900139001', category: 'custom', role: '婚车', remark: '6辆婚车，提前确认路线' },
-  { id: 'ec4', name: '花艺师', phone: '13700137001', category: 'custom', role: '花艺', remark: '手捧花+现场花艺布置' },
-  { id: 'ec5', name: '伴郎张伟', phone: '13800138001', category: 'guest', role: '伴郎', remark: '新郎大学室友' },
-  { id: 'ec6', name: '伴娘李娜', phone: '13800138002', category: 'guest', role: '伴娘', remark: '新娘闺蜜' }
+  { id: 'ec1', name: '婚车队长', phone: '13900139001', category: 'custom', role: '婚车', remark: '6辆婚车，提前确认路线' },
+  { id: 'ec2', name: '花艺师', phone: '13700137001', category: 'custom', role: '花艺', remark: '手捧花+现场花艺布置' },
+  { id: 'ec3', name: '甜品师', phone: '13600136001', category: 'custom', role: '甜品', remark: '婚礼蛋糕+甜品台' },
+  { id: 'ec4', name: '灯光师', phone: '13500135001', category: 'custom', role: '灯光', remark: '仪式灯光+追光灯' },
+  { id: 'ec5', name: '音响师', phone: '13400134001', category: 'custom', role: '音响', remark: '全场音响+背景音乐' }
 ]

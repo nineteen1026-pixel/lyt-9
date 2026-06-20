@@ -105,8 +105,23 @@ const getAvatarColorClass = (category: EmergencyContactCategory) => {
   return map[category] || 'bg-gray-400'
 }
 
+const hasMask = (phone: string) => /[xX*]/.test(phone)
+
+const cleanPhoneNumber = (phone: string) => phone.replace(/[xX*\s\-]/g, '')
+
 const callContact = (phone: string) => {
-  window.open(`tel:${phone}`, '_self')
+  const isMasked = hasMask(phone)
+  const cleanPhone = cleanPhoneNumber(phone)
+  const isCompletePhone = /^\d+$/.test(cleanPhone) && 
+    (cleanPhone.length === 11 || (cleanPhone.length >= 7 && cleanPhone.length <= 8))
+  
+  if (isMasked) {
+    alert(`⚠️ 该号码包含掩码\n\n原始号码：${phone}\n提取数字：${cleanPhone}\n\n掩码号码不完整，无法直接拨号，请补全号码后手动拨打`)
+  } else if (isCompletePhone) {
+    window.open(`tel:${cleanPhone}`, '_self')
+  } else {
+    alert(`电话号码 "${phone}" 格式不正确，请检查后手动拨打`)
+  }
 }
 
 const openAddForm = () => {
@@ -409,7 +424,7 @@ const removeContact = (id: string) => {
 
                     <div class="flex items-center gap-1 flex-shrink-0">
                       <a
-                        :href="`tel:${contact.phone}`"
+                        :href="hasMask(contact.phone) ? null : `tel:${cleanPhoneNumber(contact.phone)}`"
                         class="flex items-center gap-1 px-3 py-2 bg-primary-500 text-white rounded-lg text-sm font-medium hover:bg-primary-600 transition-colors"
                         @click.prevent="callContact(contact.phone)"
                       >
