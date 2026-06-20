@@ -164,12 +164,16 @@ const earliestFittingDate = computed(() => {
 })
 
 const photographyContractDeadline = computed(() => {
-  if (!earliestShootDate.value) return null
+  if (!earliestShootDate.value) {
+    return addDaysLocal(scheduleStore.weddingDate, -45)
+  }
   return addDaysLocal(earliestShootDate.value, -30)
 })
 
 const dressContractDeadline = computed(() => {
-  if (!earliestFittingDate.value) return null
+  if (!earliestFittingDate.value) {
+    return addDaysLocal(scheduleStore.weddingDate, -30)
+  }
   return addDaysLocal(earliestFittingDate.value, -15)
 })
 
@@ -653,8 +657,8 @@ const categoryToModuleId: Record<string, string> = {
   '场地': 'venues',
   '摄影': 'photography',
   '婚纱': 'dress',
-  '餐饮': 'guests',
-  '化妆': 'budget',
+  '餐饮': 'budget',
+  '化妆': 'photography',
   '礼仪': 'budget',
   '其他': 'budget'
 }
