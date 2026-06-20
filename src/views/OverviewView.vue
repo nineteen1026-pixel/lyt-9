@@ -228,73 +228,118 @@ interface ModuleProgress {
   progress: number
   color: string
   bgColor: string
+  deadline: string | null
+  overdue: boolean
 }
 
-const modulesProgress = computed<ModuleProgress[]>(() => [
-  {
-    id: 'budget',
-    name: '预算',
-    path: '/budget',
-    icon: Wallet,
-    progress: budgetCompletionProgress.value,
-    color: 'text-primary-500',
-    bgColor: 'bg-primary-100'
-  },
-  {
-    id: 'guests',
-    name: '宾客',
-    path: '/guests',
-    icon: Users,
-    progress: guestsProgress.value,
-    color: 'text-blue-500',
-    bgColor: 'bg-blue-100'
-  },
-  {
-    id: 'venues',
-    name: '场地',
-    path: '/venues',
-    icon: Building2,
-    progress: venuesProgress.value,
-    color: 'text-purple-500',
-    bgColor: 'bg-purple-100'
-  },
-  {
-    id: 'photography',
-    name: '摄影',
-    path: '/photography',
-    icon: Camera,
-    progress: photographyProgress.value,
-    color: 'text-amber-500',
-    bgColor: 'bg-amber-100'
-  },
-  {
-    id: 'dress',
-    name: '婚纱',
-    path: '/dress',
-    icon: Shirt,
-    progress: dressProgress.value,
-    color: 'text-pink-500',
-    bgColor: 'bg-pink-100'
-  },
-  {
-    id: 'schedule',
-    name: '流程',
-    path: '/schedule',
-    icon: Calendar,
-    progress: scheduleProgress.value,
-    color: 'text-emerald-500',
-    bgColor: 'bg-emerald-100'
-  },
-  {
-    id: 'rehearsal',
-    name: '彩排',
-    path: '/rehearsal',
-    icon: ListChecks,
-    progress: rehearsalProgress.value,
-    color: 'text-orange-500',
-    bgColor: 'bg-orange-100'
-  }
-].filter(m => isModuleVisible(m.id, roleStore.currentRole)))
+const moduleDeadlines = computed<Record<string, string | null>>(() => ({
+  budget: budgetPlanDeadline.value,
+  guests: guestsConfirmDeadline.value,
+  venues: venueBookDeadline.value,
+  photography: photographyContractDeadline.value,
+  dress: dressContractDeadline.value,
+  schedule: schedulePlanDeadline.value,
+  rehearsal: rehearsalStore.rehearsalInfo.date
+}))
+
+const getModuleOverdue = (moduleId: string, progress: number): boolean => {
+  const deadline = moduleDeadlines.value[moduleId]
+  if (!deadline || progress >= 100) return false
+  return daysUntil(deadline) < 0
+}
+
+const modulesProgress = computed<ModuleProgress[]>(() => {
+  const today = getTodayLocal()
+  const modules: ModuleProgress[] = [
+    {
+      id: 'budget',
+      name: '预算',
+      path: '/budget',
+      icon: Wallet,
+      progress: budgetCompletionProgress.value,
+      color: 'text-primary-500',
+      bgColor: 'bg-primary-100',
+      deadline: moduleDeadlines.value.budget,
+      overdue: getModuleOverdue('budget', budgetCompletionProgress.value)
+    },
+    {
+      id: 'guests',
+      name: '宾客',
+      path: '/guests',
+      icon: Users,
+      progress: guestsProgress.value,
+      color: 'text-blue-500',
+      bgColor: 'bg-blue-100',
+      deadline: moduleDeadlines.value.guests,
+      overdue: getModuleOverdue('guests', guestsProgress.value)
+    },
+    {
+      id: 'venues',
+      name: '场地',
+      path: '/venues',
+      icon: Building2,
+      progress: venuesProgress.value,
+      color: 'text-purple-500',
+      bgColor: 'bg-purple-100',
+      deadline: moduleDeadlines.value.venues,
+      overdue: getModuleOverdue('venues', venuesProgress.value)
+    },
+    {
+      id: 'photography',
+      name: '摄影',
+      path: '/photography',
+      icon: Camera,
+      progress: photographyProgress.value,
+      color: 'text-amber-500',
+      bgColor: 'bg-amber-100',
+      deadline: moduleDeadlines.value.photography,
+      overdue: getModuleOverdue('photography', photographyProgress.value)
+    },
+    {
+      id: 'dress',
+      name: '婚纱',
+      path: '/dress',
+      icon: Shirt,
+      progress: dressProgress.value,
+      color: 'text-pink-500',
+      bgColor: 'bg-pink-100',
+      deadline: moduleDeadlines.value.dress,
+      overdue: getModuleOverdue('dress', dressProgress.value)
+    },
+    {
+      id: 'schedule',
+      name: '流程',
+      path: '/schedule',
+      icon: Calendar,
+      progress: scheduleProgress.value,
+      color: 'text-emerald-500',
+      bgColor: 'bg-emerald-100',
+      deadline: moduleDeadlines.value.schedule,
+      overdue: getModuleOverdue('schedule', scheduleProgress.value)
+    },
+    {
+      id: 'rehearsal',
+      name: '彩排',
+      path: '/rehearsal',
+      icon: ListChecks,
+      progress: rehearsalProgress.value,
+      color: 'text-orange-500',
+      bgColor: 'bg-orange-100',
+      deadline: moduleDeadlines.value.rehearsal,
+      overdue: getModuleOverdue('rehearsal', rehearsalProgress.value)
+    }
+  ]
+
+  return modules
+    .filter(m => isModuleVisible(m.id, roleStore.currentRole))
+    .sort((a, b) => {
+      if (a.overdue && !b.overdue) return -1
+      if (!a.overdue && b.overdue) return 1
+      if (a.progress < 100 && b.progress >= 100) return -1
+      if (a.progress >= 100 && b.progress < 100) return 1
+      return 0
+    })
+})
 
 const overallProgress = computed(() => {
   const total = modulesProgress.value.reduce((sum, m) => sum + m.progress, 0)
@@ -604,6 +649,38 @@ const getProgressColor = (progress: number) => {
   return 'text-red-500'
 }
 
+const categoryToModuleId: Record<string, string> = {
+  '场地': 'venues',
+  '摄影': 'photography',
+  '婚纱': 'dress',
+  '餐饮': 'guests',
+  '化妆': 'budget',
+  '礼仪': 'budget',
+  '其他': 'budget'
+}
+
+const isChecklistItemOverdue = (item: typeof checklistStore.items[0]): boolean => {
+  if (item.completed) return false
+  const moduleId = item.budgetCategory ? categoryToModuleId[item.budgetCategory] : null
+  if (!moduleId) return false
+  const deadline = moduleDeadlines.value[moduleId]
+  if (!deadline) return false
+  return daysUntil(deadline) < 0
+}
+
+const sortedChecklistItems = computed(() => {
+  const items = checklistStore.items.map(item => ({
+    ...item,
+    overdue: isChecklistItemOverdue(item)
+  }))
+  return items.sort((a, b) => {
+    if (a.overdue && !b.overdue) return -1
+    if (!a.overdue && b.overdue) return 1
+    if (a.completed !== b.completed) return a.completed ? 1 : -1
+    return a.order - b.order
+  })
+})
+
 const navigateTo = (path: string) => {
   router.push(path)
 }
@@ -649,16 +726,22 @@ const navigateTo = (path: string) => {
               <Target class="w-5 h-5 text-primary-500" />
               {{ roleStore.roleLabel }}筹备模块
             </h2>
-            <span class="text-sm text-gray-500">{{ modulesProgress.filter(m => m.progress >= 100).length }}/{{ modulesProgress.length }} 已完成</span>
+            <span class="text-sm text-gray-500">{{ modulesProgress.filter(m => m.progress >= 100).length }}/{{ modulesProgress.length }} 已完成 <span v-if="modulesProgress.some(m => m.overdue)" class="text-yellow-500 ml-1">· {{ modulesProgress.filter(m => m.overdue).length }}项逾期</span></span>
           </div>
           <div class="grid grid-cols-4 gap-3">
             <div
               v-for="module in modulesProgress"
               :key="module.id"
               @click="navigateTo(module.path)"
-              class="flex flex-col items-center p-3 rounded-xl cursor-pointer transition-all duration-300 hover:scale-105 hover:shadow-md"
-              :class="module.bgColor"
+              class="flex flex-col items-center p-3 rounded-xl cursor-pointer transition-all duration-300 hover:scale-105 hover:shadow-md relative"
+              :class="module.overdue ? 'bg-yellow-50 ring-2 ring-yellow-300' : module.bgColor"
             >
+              <span
+                v-if="module.overdue"
+                class="absolute -top-1.5 -right-1.5 w-4 h-4 bg-yellow-400 rounded-full flex items-center justify-center"
+              >
+                <AlertCircle class="w-3 h-3 text-white" />
+              </span>
               <div class="relative w-12 h-12 mb-2">
                 <svg class="w-12 h-12 transform -rotate-90">
                   <circle
@@ -680,15 +763,18 @@ const navigateTo = (path: string) => {
                     :stroke-dasharray="125.6"
                     :stroke-dashoffset="125.6 - (125.6 * module.progress) / 100"
                     class="transition-all duration-1000"
-                    :class="module.color"
+                    :class="module.overdue ? 'text-yellow-500' : module.color"
                   />
                 </svg>
                 <div class="absolute inset-0 flex items-center justify-center">
-                  <component :is="module.icon" class="w-5 h-5" :class="module.color" />
+                  <component :is="module.icon" class="w-5 h-5" :class="module.overdue ? 'text-yellow-500' : module.color" />
                 </div>
               </div>
-              <span class="text-xs font-medium text-gray-700">{{ module.name }}</span>
-              <span class="text-xs font-bold" :class="module.color">{{ module.progress.toFixed(0) }}%</span>
+              <span class="text-xs font-medium" :class="module.overdue ? 'text-yellow-700' : 'text-gray-700'">{{ module.name }}</span>
+              <span class="text-xs font-bold" :class="module.overdue ? 'text-yellow-600' : module.color">{{ module.progress.toFixed(0) }}%</span>
+              <span v-if="module.deadline" class="text-[10px] mt-0.5" :class="module.overdue ? 'text-yellow-500 font-semibold' : 'text-gray-400'">
+                {{ module.overdue ? '已逾期' : `截止${parseDate(module.deadline).getMonth()+1}/${parseDate(module.deadline).getDate()}` }}
+              </span>
             </div>
           </div>
         </div>
@@ -769,11 +855,13 @@ const navigateTo = (path: string) => {
 
           <div v-else class="space-y-2">
             <div
-              v-for="(item, index) in checklistStore.items"
+              v-for="(item, index) in sortedChecklistItems"
               :key="item.id"
               class="flex items-start gap-3 p-3 rounded-xl border transition-all duration-300"
               :class="[
-                item.completed ? 'bg-green-50/50 border-green-100' : 'bg-white border-gray-100 hover:shadow-sm'
+                item.completed ? 'bg-green-50/50 border-green-100' :
+                item.overdue ? 'bg-yellow-50 border-yellow-300 ring-1 ring-yellow-200' :
+                'bg-white border-gray-100 hover:shadow-sm'
               ]"
               :style="{ animationDelay: `${0.4 + index * 0.05}s` }"
             >
@@ -783,19 +871,28 @@ const navigateTo = (path: string) => {
                 :class="[
                   item.completed
                     ? 'bg-green-500 border-green-500'
+                    : item.overdue
+                    ? 'bg-yellow-400 border-yellow-400'
                     : 'bg-white border-gray-300 hover:border-primary-400'
                 ]"
               >
                 <Check v-if="item.completed" class="w-3.5 h-3.5 text-white" />
+                <AlertCircle v-else-if="item.overdue" class="w-3.5 h-3.5 text-white" />
               </button>
               <div class="flex-1 min-w-0">
                 <div class="flex items-center gap-2">
                   <h3
                     class="font-semibold text-sm"
-                    :class="item.completed ? 'text-gray-400 line-through' : 'text-gray-800'"
+                    :class="item.completed ? 'text-gray-400 line-through' : item.overdue ? 'text-yellow-700' : 'text-gray-800'"
                   >
                     {{ item.title }}
                   </h3>
+                  <span
+                    v-if="item.overdue && !item.completed"
+                    class="text-[10px] px-1.5 py-0.5 rounded-full bg-yellow-100 text-yellow-600 flex-shrink-0"
+                  >
+                    已逾期
+                  </span>
                   <span
                     v-if="item.budgetCategory"
                     class="text-[10px] px-1.5 py-0.5 rounded-full flex-shrink-0"
@@ -809,7 +906,7 @@ const navigateTo = (path: string) => {
                     <span v-if="budgetStore.isCategoryConfirmed(item.budgetCategory)"> · 已确认</span>
                   </span>
                 </div>
-                <p class="text-xs text-gray-500 mt-1">{{ item.description }}</p>
+                <p class="text-xs mt-1" :class="item.overdue && !item.completed ? 'text-yellow-600' : 'text-gray-500'">{{ item.description }}</p>
               </div>
             </div>
           </div>
