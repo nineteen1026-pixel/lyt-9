@@ -91,12 +91,20 @@ const goBack = () => {
   router.push('/guests')
 }
 
-const goToSchedule = () => {
-  router.push('/schedule')
+const goToSchedule = (itemId?: string) => {
+  if (itemId) {
+    router.push({ path: '/schedule', query: { highlight: itemId } })
+  } else {
+    router.push('/schedule')
+  }
 }
 
-const goToRehearsal = () => {
-  router.push('/rehearsal')
+const goToRehearsal = (stepId?: string) => {
+  if (stepId) {
+    router.push({ path: '/rehearsal', query: { highlight: stepId } })
+  } else {
+    router.push('/rehearsal')
+  }
 }
 </script>
 
@@ -234,7 +242,7 @@ const goToRehearsal = () => {
                   </div>
                 </div>
                 <button
-                  @click="goToSchedule"
+                  @click="goToSchedule(item.id)"
                   class="flex-shrink-0 w-8 h-8 rounded-lg bg-primary-50 flex items-center justify-center text-primary-400 hover:bg-primary-100 hover:text-primary-600 transition-colors"
                   title="前往流程编辑"
                 >
@@ -295,7 +303,7 @@ const goToRehearsal = () => {
                   </div>
                 </div>
                 <button
-                  @click="goToRehearsal"
+                  @click="goToRehearsal(step.id)"
                   class="flex-shrink-0 w-8 h-8 rounded-lg bg-primary-50 flex items-center justify-center text-primary-400 hover:bg-primary-100 hover:text-primary-600 transition-colors"
                   title="前往彩排编辑"
                 >

@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import { ref, computed } from 'vue'
+import { ref, computed, onMounted, nextTick } from 'vue'
+import { useRoute } from 'vue-router'
 import { useRehearsalStore } from '@/stores/rehearsal'
 import { useScheduleStore } from '@/stores/schedule'
 import { useRoleStore } from '@/stores/role'
@@ -11,9 +12,12 @@ import { storeToRefs } from 'pinia'
 const roleStore = useRoleStore()
 const rehearsalStore = useRehearsalStore()
 const scheduleStore = useScheduleStore()
+const route = useRoute()
 const { staff } = storeToRefs(rehearsalStore)
 const { items: scheduleItems } = storeToRefs(scheduleStore)
 const expandedNotice = ref<string | null>('1')
+
+const highlightStepId = computed(() => (route.query.highlight as string) || '')
 
 const editingStaffId = ref<string | null>(null)
 const editStaffForm = ref<Partial<StaffMember>>({ name: '', role: '', phone: '' })
@@ -147,6 +151,28 @@ const saveEditStepLink = () => {
   }
   cancelEditStepLink()
 }
+
+const scrollToStep = (stepId: string) => {
+  if (!stepId) return
+  nextTick(() => {
+    setTimeout(() => {
+      const el = document.querySelector(`[data-step-id="${stepId}"]`)
+      if (el) {
+        el.scrollIntoView({ behavior: 'smooth', block: 'center' })
+      }
+      const step = rehearsalStore.steps.find(s => s.id === stepId)
+      if (step) {
+        startEditStep(step)
+      }
+    }, 600)
+  })
+}
+
+onMounted(() => {
+  if (highlightStepId.value) {
+    scrollToStep(highlightStepId.value)
+  }
+})
 </script>
 
 <template>
@@ -216,7 +242,9 @@ const saveEditStepLink = () => {
             <div 
               v-for="(step, index) in rehearsalStore.steps" 
               :key="step.id"
+              :data-step-id="step.id"
               class="animate-slide-up bg-white rounded-xl p-4 shadow-sm flex gap-4"
+              :class="highlightStepId === step.id ? 'ring-2 ring-primary-400' : ''"
               :style="{ animationDelay: `${0.3 + index * 0.1}s` }"
             >
               <div 

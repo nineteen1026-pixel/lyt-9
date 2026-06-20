@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed } from 'vue'
+import { useRoute } from 'vue-router'
 import { useScheduleStore } from '@/stores/schedule'
 import { useRehearsalStore } from '@/stores/rehearsal'
 import { useRoleStore } from '@/stores/role'
@@ -11,8 +12,11 @@ import { storeToRefs } from 'pinia'
 const scheduleStore = useScheduleStore()
 const rehearsalStore = useRehearsalStore()
 const roleStore = useRoleStore()
+const route = useRoute()
 const { weddingDate, items } = storeToRefs(scheduleStore)
 const { staff } = storeToRefs(rehearsalStore)
+
+const highlightId = computed(() => (route.query.highlight as string) || '')
 
 const staffOptions = computed(() => {
   return staff.value.map(m => ({ id: m.id, name: m.name, role: m.role }))
@@ -120,6 +124,7 @@ const handleOrderUpdate = (orderedIds: string[]) => {
           :editable="true"
           :draggable="true"
           :staff-options="staffOptions"
+          :highlight-id="highlightId"
           @update:person-in-charge="handlePersonInChargeUpdate"
           @update:order="handleOrderUpdate"
         />

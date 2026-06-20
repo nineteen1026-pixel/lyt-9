@@ -23,7 +23,8 @@
             isEvent(element) ? 'mb-10' : 'mb-8',
             'last:mb-0',
             element.type === 'separator' ? 'pointer-events-none' : '',
-            { 'opacity-0 translate-y-4': !visibleItems[index] }
+            { 'opacity-0 translate-y-4': !visibleItems[index] },
+            highlightId && isEvent(element) && element.id === highlightId ? 'ring-2 ring-primary-400 rounded-xl' : ''
           ]"
           :style="{
             transition: `all 0.55s cubic-bezier(0.34, 1.56, 0.64, 1) ${index * 0.08}s`,
@@ -44,6 +45,7 @@
 
           <template v-else>
             <div
+              :data-timeline-id="element.id"
               class="absolute -left-[22px] top-6 w-5 h-5 rounded-full border-4 border-white shadow-md z-20"
               :class="[
                 index === 0 || isFirstEvent(index) ? 'bg-primary-500' : 'bg-primary-400',
@@ -141,6 +143,7 @@
 <script setup lang="ts">
 import { ref, onMounted, onUnmounted, nextTick, watch, computed } from 'vue'
 import draggable from 'vuedraggable'
+import { useRoute, useRouter } from 'vue-router'
 
 type SeparatorItem = { type: 'separator'; label: string }
 type EventItem = {
@@ -163,10 +166,12 @@ const props = withDefaults(defineProps<{
   editable?: boolean
   draggable?: boolean
   staffOptions?: StaffOption[]
+  highlightId?: string
 }>(), {
   editable: false,
   draggable: false,
-  staffOptions: () => []
+  staffOptions: () => [],
+  highlightId: ''
 })
 
 const emit = defineEmits<{
@@ -240,7 +245,35 @@ const onDragEnd = () => {
   emit('update:order', orderedIds)
 }
 
+const route = useRoute()
+const router = useRouter()
+
+const scrollToHighlight = (id: string) => {
+  if (!id) return
+  nextTick(() => {
+    setTimeout(() => {
+      const el = document.querySelector(`[data-timeline-id="${id}"]`)
+      if (el) {
+        el.scrollIntoView({ behavior: 'smooth', block: 'center' })
+        const eventItem = localItems.value.find(item => isEvent(item) && item.id === id)
+        if (eventItem && props.editable) {
+          startEdit(eventItem as EventItem)
+        }
+      }
+    }, 600)
+  })
+}
+
+watch(() => props.highlightId, (newId) => {
+  if (newId) {
+    scrollToHighlight(newId)
+  }
+}, { immediate: true })
+
 onMounted(() => {
+  if (props.highlightId) {
+    scrollToHighlight(props.highlightId)
+  }
 })
 
 onUnmounted(() => {
