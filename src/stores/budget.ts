@@ -31,6 +31,16 @@ export const useBudgetStore = defineStore('budget', () => {
       budget: item.budget ?? item.planned
     }
     items.value.push(newItem)
+    addChangeLog({
+      category: item.category,
+      changeType: 'add',
+      sourceModule: '预算',
+      description: `新增预算分类「${item.category}」`,
+      oldAmount: 0,
+      newAmount: item.actual,
+      difference: item.actual,
+      operator: '用户'
+    })
   }
 
   function updateItem(id: string, updates: Partial<Omit<BudgetItem, 'id'>>) {
@@ -58,14 +68,14 @@ export const useBudgetStore = defineStore('budget', () => {
     return items.value.find(item => item.id === id)
   }
 
-  function updateActualByCategory(category: string, actual: number, sourceModule: string = '预算', description: string = '', operator: string = '系统') {
+  function updateActualByCategory(category: string, actual: number, sourceModule: string = '预算', description: string = '', operator: string = '系统', changeType: ExpenseChangeType = 'update') {
     const index = items.value.findIndex(item => item.category === category)
     if (index !== -1) {
       const oldAmount = items.value[index].actual
       items.value[index].actual = actual
       addChangeLog({
         category,
-        changeType: sourceModule === '预算' ? 'update' : 'sync',
+        changeType,
         sourceModule,
         description: description || `${category}实际支出变更`,
         oldAmount,
@@ -175,19 +185,19 @@ export const useBudgetStore = defineStore('budget', () => {
       .filter(v => v.contracted)
       .reduce((sum, v) => sum + v.contractPrice, 0)
     const venueNames = venuesStore.venues.filter(v => v.contracted).map(v => v.name).join('、')
-    updateActualByCategory('场地', totalVenuesContracted, '场地', `同步选型金额：${venueNames || '无'}已签约`, '系统同步')
+    updateActualByCategory('场地', totalVenuesContracted, '场地选型', `同步选型金额：${venueNames || '无'}已签约`, '系统同步', 'sync')
 
     const totalPhotographyContracted = photographyStore.items
       .filter(p => p.contracted)
       .reduce((sum, p) => sum + p.contractPrice, 0)
     const photoNames = photographyStore.items.filter(p => p.contracted).map(p => p.teamName).join('、')
-    updateActualByCategory('摄影', totalPhotographyContracted, '摄影', `同步选型金额：${photoNames || '无'}已签约`, '系统同步')
+    updateActualByCategory('摄影', totalPhotographyContracted, '摄影选型', `同步选型金额：${photoNames || '无'}已签约`, '系统同步', 'sync')
 
     const totalDressContracted = dressStore.dresses
       .filter(d => d.contracted)
       .reduce((sum, d) => sum + d.contractPrice, 0)
     const dressNames = dressStore.dresses.filter(d => d.contracted).map(d => d.name).join('、')
-    updateActualByCategory('婚纱', totalDressContracted, '婚纱', `同步选型金额：${dressNames || '无'}已签约`, '系统同步')
+    updateActualByCategory('婚纱', totalDressContracted, '婚纱选型', `同步选型金额：${dressNames || '无'}已签约`, '系统同步', 'sync')
   }
 
   return {
