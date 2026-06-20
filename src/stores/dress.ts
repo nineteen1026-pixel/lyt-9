@@ -71,6 +71,7 @@ export const useDressStore = defineStore('dress', () => {
     }
     const index = dresses.value.findIndex(dress => dress.id === id)
     if (index !== -1) {
+      const dress = dresses.value[index]
       dresses.value[index].contracted = true
       dresses.value[index].contractPrice = contractPrice
       
@@ -78,7 +79,12 @@ export const useDressStore = defineStore('dress', () => {
         .filter(d => d.contracted)
         .reduce((sum, d) => sum + d.contractPrice, 0)
       
-      budgetStore.updateActualByCategory('婚纱', totalContracted)
+      const contractedNames = dresses.value
+        .filter(d => d.contracted)
+        .map(d => d.name)
+        .join('、')
+      
+      budgetStore.recordContractChange('婚纱', totalContracted, '用户', `签约${dress.name}${contractedNames ? `，全部：${contractedNames}` : ''}`)
     }
   }
 
@@ -86,6 +92,7 @@ export const useDressStore = defineStore('dress', () => {
     const budgetStore = useBudgetStore()
     const index = dresses.value.findIndex(dress => dress.id === id)
     if (index !== -1) {
+      const dress = dresses.value[index]
       dresses.value[index].contracted = false
       dresses.value[index].contractPrice = 0
       
@@ -93,7 +100,12 @@ export const useDressStore = defineStore('dress', () => {
         .filter(d => d.contracted)
         .reduce((sum, d) => sum + d.contractPrice, 0)
       
-      budgetStore.updateActualByCategory('婚纱', totalContracted)
+      const contractedNames = dresses.value
+        .filter(d => d.contracted)
+        .map(d => d.name)
+        .join('、')
+      
+      budgetStore.recordContractChange('婚纱', totalContracted, '用户', `取消${dress.name}${contractedNames ? `，剩余：${contractedNames}` : ''}`)
     }
   }
 
@@ -101,12 +113,17 @@ export const useDressStore = defineStore('dress', () => {
     const budgetStore = useBudgetStore()
     const index = dresses.value.findIndex(dress => dress.id === id)
     if (index !== -1) {
+      const deletedDress = dresses.value[index]
       dresses.value.splice(index, 1)
 
       const totalContracted = dresses.value
         .filter(d => d.contracted)
         .reduce((sum, d) => sum + d.contractPrice, 0)
-      budgetStore.updateActualByCategory('婚纱', totalContracted)
+      const contractedNames = dresses.value
+        .filter(d => d.contracted)
+        .map(d => d.name)
+        .join('、')
+      budgetStore.recordContractChange('婚纱', totalContracted, '用户', `删除${deletedDress.name}${contractedNames ? `，剩余：${contractedNames}` : ''}`)
     }
   }
 

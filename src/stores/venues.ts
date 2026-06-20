@@ -48,11 +48,12 @@ export const useVenuesStore = defineStore('venues', () => {
     })
     const index = venues.value.findIndex(venue => venue.id === id)
     if (index !== -1) {
+      const venue = venues.value[index]
       venues.value[index].contracted = true
       venues.value[index].contractPrice = contractPrice
       venues.value[index].status = 'booked'
 
-      budgetStore.updateActualByCategory('场地', contractPrice)
+      budgetStore.recordContractChange('场地', contractPrice, '用户', venue.name)
       budgetStore.lockCategory('场地')
     }
   }
@@ -61,11 +62,12 @@ export const useVenuesStore = defineStore('venues', () => {
     const budgetStore = useBudgetStore()
     const index = venues.value.findIndex(venue => venue.id === id)
     if (index !== -1) {
+      const venue = venues.value[index]
       venues.value[index].contracted = false
       venues.value[index].contractPrice = 0
       venues.value[index].status = 'alternative'
 
-      budgetStore.updateActualByCategory('场地', 0)
+      budgetStore.recordContractChange('场地', 0, '用户', venue.name)
       budgetStore.unlockCategory('场地')
     }
   }
@@ -80,7 +82,11 @@ export const useVenuesStore = defineStore('venues', () => {
       const totalContracted = venues.value
         .filter(v => v.contracted)
         .reduce((sum, v) => sum + v.contractPrice, 0)
-      budgetStore.updateActualByCategory('场地', totalContracted)
+      const contractedNames = venues.value
+        .filter(v => v.contracted)
+        .map(v => v.name)
+        .join('、')
+      budgetStore.recordContractChange('场地', totalContracted, '用户', `删除${deletedVenue.name}${contractedNames ? `，剩余：${contractedNames}` : ''}`)
 
       if (deletedVenue.contracted && totalContracted === 0) {
         budgetStore.unlockCategory('场地')

@@ -59,10 +59,11 @@ export const usePhotographyStore = defineStore('photography', () => {
     })
     const index = items.value.findIndex(item => item.id === id)
     if (index !== -1) {
+      const item = items.value[index]
       items.value[index].contracted = true
       items.value[index].contractPrice = contractPrice
       
-      budgetStore.updateActualByCategory('摄影', contractPrice)
+      budgetStore.recordContractChange('摄影', contractPrice, '用户', item.teamName)
     }
   }
 
@@ -70,10 +71,11 @@ export const usePhotographyStore = defineStore('photography', () => {
     const budgetStore = useBudgetStore()
     const index = items.value.findIndex(item => item.id === id)
     if (index !== -1) {
+      const item = items.value[index]
       items.value[index].contracted = false
       items.value[index].contractPrice = 0
 
-      budgetStore.updateActualByCategory('摄影', 0)
+      budgetStore.recordContractChange('摄影', 0, '用户', item.teamName)
     }
   }
 
@@ -81,12 +83,17 @@ export const usePhotographyStore = defineStore('photography', () => {
     const budgetStore = useBudgetStore()
     const index = items.value.findIndex(item => item.id === id)
     if (index !== -1) {
+      const deletedItem = items.value[index]
       items.value.splice(index, 1)
 
       const totalContracted = items.value
         .filter(p => p.contracted)
         .reduce((sum, p) => sum + p.contractPrice, 0)
-      budgetStore.updateActualByCategory('摄影', totalContracted)
+      const contractedNames = items.value
+        .filter(p => p.contracted)
+        .map(p => p.teamName)
+        .join('、')
+      budgetStore.recordContractChange('摄影', totalContracted, '用户', `删除${deletedItem.teamName}${contractedNames ? `，剩余：${contractedNames}` : ''}`)
     }
   }
 
