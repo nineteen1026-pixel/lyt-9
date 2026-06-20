@@ -37,7 +37,6 @@ export const useScheduleStore = defineStore('schedule', () => {
       newItem.personInCharge = rehearsalStore.getStaffNameById(newItem.personInChargeId)
     }
     items.value.push(newItem)
-    items.value.sort((a, b) => a.time.localeCompare(b.time))
   }
 
   function updateItem(id: string, updates: Partial<Omit<ScheduleItem, 'id'>>) {
@@ -53,8 +52,6 @@ export const useScheduleStore = defineStore('schedule', () => {
           items.value[index].personInCharge = name
         }
       }
-
-      items.value.sort((a, b) => a.time.localeCompare(b.time))
 
       const newPersonId = items.value[index].personInChargeId
       const newPersonName = items.value[index].personInCharge
@@ -101,17 +98,42 @@ export const useScheduleStore = defineStore('schedule', () => {
   function reorderItems(orderedIds: string[]) {
     if (!orderedIds || orderedIds.length === 0) return
 
+    const timesSorted = [...items.value]
+      .map(i => i.time)
+      .sort((a, b) => a.localeCompare(b))
+
     const orderedMap = new Map<string, number>()
     orderedIds.forEach((id, idx) => orderedMap.set(id, idx))
 
-    items.value.sort((a, b) => {
-      const idxA = orderedMap.get(a.id)
-      const idxB = orderedMap.get(b.id)
-      if (idxA === undefined && idxB === undefined) return a.time.localeCompare(b.time)
-      if (idxA === undefined) return 1
-      if (idxB === undefined) return -1
+    const knownItems: ScheduleItem[] = []
+    const unknownItems: ScheduleItem[] = []
+    items.value.forEach(item => {
+      if (orderedMap.has(item.id)) {
+        knownItems.push(item)
+      } else {
+        unknownItems.push(item)
+      }
+    })
+
+    knownItems.sort((a, b) => {
+      const idxA = orderedMap.get(a.id)!
+      const idxB = orderedMap.get(b.id)!
       return idxA - idxB
     })
+
+    unknownItems.sort((a, b) => a.time.localeCompare(b.time))
+
+    const sortedKnown = knownItems.map((item, idx) => ({
+      ...item,
+      time: timesSorted[idx] ?? item.time
+    }))
+
+    const sortedUnknown = unknownItems.map((item, idx) => ({
+      ...item,
+      time: timesSorted[sortedKnown.length + idx] ?? item.time
+    }))
+
+    items.value = [...sortedKnown, ...sortedUnknown]
 
     if (!isSyncing) {
       isSyncing = true
