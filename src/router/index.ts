@@ -2,6 +2,7 @@ import { createRouter, createWebHistory, type RouteRecordRaw } from 'vue-router'
 import OverviewView from '@/views/OverviewView.vue'
 import BudgetView from '@/views/BudgetView.vue'
 import GuestsView from '@/views/GuestsView.vue'
+import GuestDetailView from '@/views/GuestDetailView.vue'
 import VenuesView from '@/views/VenuesView.vue'
 import PhotographyView from '@/views/PhotographyView.vue'
 import DressView from '@/views/DressView.vue'
@@ -33,6 +34,12 @@ const routes = [
     path: '/guests',
     name: 'guests',
     component: GuestsView,
+    meta: { moduleId: 'guests' }
+  },
+  {
+    path: '/guests/:id',
+    name: 'guest-detail',
+    component: GuestDetailView,
     meta: { moduleId: 'guests' }
   },
   {

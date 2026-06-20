@@ -83,7 +83,7 @@ const tabs = computed(() =>
   allTabs.filter(tab => isModuleVisible(tab.id, roleStore.currentRole))
 )
 
-const isActive = (path: string) => route.path === path
+const isActive = (path: string) => route.path === path || route.path.startsWith(path + '/')
 
 const handleTabClick = (path: string) => {
   if (!isActive(path)) {

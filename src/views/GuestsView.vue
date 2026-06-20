@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref, computed, watch } from 'vue'
+import { useRouter } from 'vue-router'
 import { useGuestsStore, type Guest, type GuestStatus, type GuestGroup, type ImportDedupeMode, type PerTableValidationResult, type AdjustmentPlan } from '@/stores/guests'
 import { useRoleStore } from '@/stores/role'
 import RoleSwitcher from '@/components/RoleSwitcher.vue'
@@ -12,6 +13,7 @@ import Toast from '@/components/Toast.vue'
 
 const roleStore = useRoleStore()
 const guestsStore = useGuestsStore()
+const router = useRouter()
 const searchQuery = ref('')
 const activeFilter = ref<GuestStatus | 'all'>('all')
 const activeGroup = ref<GuestGroup | 'all'>(roleStore.currentRole)
@@ -451,6 +453,10 @@ const getStrategyLabel = (strategy: string) => {
     default: return '智能调整'
   }
 }
+
+const goToGuestDetail = (guestId: string) => {
+  router.push(`/guests/${guestId}`)
+}
 </script>
 
 <template>
@@ -820,14 +826,15 @@ const getStrategyLabel = (strategy: string) => {
               >
                 <GripVertical class="w-4 h-4 text-gray-300 flex-shrink-0" />
                 <div
-                  class="w-9 h-9 rounded-full flex items-center justify-center text-white font-bold text-sm flex-shrink-0"
+                  class="w-9 h-9 rounded-full flex items-center justify-center text-white font-bold text-sm flex-shrink-0 cursor-pointer"
                   :class="getAvatarColor(guest.name)"
+                  @click.stop="goToGuestDetail(guest.id)"
                 >
                   {{ guest.avatar }}
                 </div>
                 <div class="flex-1 min-w-0">
                   <div class="flex items-center gap-1.5">
-                    <p class="text-sm font-medium text-gray-800 truncate">{{ guest.name }}</p>
+                    <p class="text-sm font-medium text-gray-800 truncate cursor-pointer hover:text-primary-500 transition-colors" @click.stop="goToGuestDetail(guest.id)">{{ guest.name }}</p>
                     <span
                       class="px-1.5 py-0.5 rounded-full text-[10px]"
                       :class="getStatusConfig(guest.status).class"
@@ -870,7 +877,8 @@ const getStrategyLabel = (strategy: string) => {
               <div
                 v-for="guest in unassignedFilteredGuests"
                 :key="guest.id"
-                class="flex items-center gap-2.5 p-2.5 rounded-xl bg-gray-50"
+                class="flex items-center gap-2.5 p-2.5 rounded-xl bg-gray-50 cursor-pointer hover:bg-gray-100 transition-colors"
+                @click="goToGuestDetail(guest.id)"
               >
                 <div
                   class="w-9 h-9 rounded-full flex items-center justify-center text-white font-bold text-sm flex-shrink-0"
@@ -895,7 +903,7 @@ const getStrategyLabel = (strategy: string) => {
                 </div>
                 <button
                   v-if="guest.status !== 'declined'"
-                  @click="openTableModal(guest)"
+                  @click.stop="openTableModal(guest)"
                   class="w-8 h-8 rounded-full bg-primary-50 flex items-center justify-center text-primary-400 hover:bg-primary-100 hover:text-primary-600 transition-colors flex-shrink-0"
                   title="编辑分桌"
                 >
@@ -915,8 +923,9 @@ const getStrategyLabel = (strategy: string) => {
           <div 
             v-for="(guest, index) in filteredGuests" 
             :key="guest.id"
-            class="animate-slide-up bg-white rounded-xl p-4 shadow-sm hover:shadow-md transition-all duration-300"
+            class="animate-slide-up bg-white rounded-xl p-4 shadow-sm hover:shadow-md transition-all duration-300 cursor-pointer"
             :style="{ animationDelay: `${0.7 + index * 0.1}s` }"
+            @click="goToGuestDetail(guest.id)"
           >
             <div class="flex items-center gap-3">
               <div 
@@ -929,7 +938,7 @@ const getStrategyLabel = (strategy: string) => {
                 <div class="flex items-center gap-2">
                   <p class="font-medium text-gray-800">{{ guest.name }}</p>
                   <button
-                    @click="cycleStatus(guest)"
+                    @click.stop="cycleStatus(guest)"
                     class="px-2 py-0.5 rounded-full text-xs cursor-pointer transition-all hover:scale-105 active:scale-95"
                     :class="getStatusConfig(guest.status).class"
                     :title="'点击切换状态：已确认 → 待定 → 缺席 → 已确认'"
@@ -947,7 +956,7 @@ const getStrategyLabel = (strategy: string) => {
                 </div>
               </div>
               <button 
-                @click="openTableModal(guest)"
+                @click.stop="openTableModal(guest)"
                 class="w-10 h-10 rounded-full bg-primary-50 flex items-center justify-center text-primary-500 hover:bg-primary-100 transition-colors"
                 :disabled="guest.status === 'declined'"
                 :class="{ 'opacity-50 cursor-not-allowed': guest.status === 'declined' }"
