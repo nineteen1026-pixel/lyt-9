@@ -55,12 +55,26 @@
 
             <div class="bg-white rounded-xl shadow-lg border border-gray-100 p-5 hover:shadow-xl hover:-translate-y-0.5 transition-all duration-300 group">
               <div class="flex items-start justify-between mb-3">
-                <span class="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-primary-50 text-primary-600 ring-1 ring-primary-100">
-                  <svg class="w-3 h-3 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-                  </svg>
-                  {{ element.time }}
-                </span>
+                <div class="flex items-center gap-2">
+                  <span class="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-primary-50 text-primary-600 ring-1 ring-primary-100">
+                    <svg class="w-3 h-3 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                    {{ element.time }}
+                  </span>
+                  <template v-if="shotEnabled && element.id">
+                    <span 
+                      class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium"
+                      :class="getShotProgressClass(element.id)"
+                    >
+                      <svg class="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
+                      </svg>
+                      {{ getShotStats(element.id).completed }}/{{ getShotStats(element.id).total }}
+                    </span>
+                  </template>
+                </div>
                 <div class="flex items-center gap-2">
                   <template v-if="draggable">
                     <button class="drag-handle p-1.5 text-gray-300 hover:text-primary-500 hover:bg-primary-50 rounded-lg cursor-grab active:cursor-grabbing transition-all opacity-0 group-hover:opacity-100" title="拖拽排序">
@@ -125,13 +139,93 @@
               </div>
               <h3 class="text-lg font-bold text-gray-800 mb-2">{{ element.title }}</h3>
               <p class="text-sm text-gray-600 mb-3 leading-relaxed">{{ element.description }}</p>
-              <div v-if="element.location" class="flex items-center text-xs text-gray-500">
+              <div v-if="element.location" class="flex items-center text-xs text-gray-500 mb-3">
                 <svg class="w-4 h-4 mr-1 text-primary-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
                   <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
                 </svg>
                 {{ element.location }}
               </div>
+
+              <template v-if="shotEnabled && element.id">
+                <div class="mt-4 pt-4 border-t border-gray-100">
+                  <div class="flex items-center justify-between mb-3">
+                    <button
+                      @click="toggleShotList(element.id!)"
+                      class="flex items-center gap-2 text-sm font-medium text-gray-700 hover:text-primary-500 transition-colors"
+                    >
+                      <svg class="w-4 h-4 text-champagne-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
+                      </svg>
+                      <span>拍摄任务清单</span>
+                      <span class="text-xs text-gray-400">({{ getShotStats(element.id).completed }}/{{ getShotStats(element.id).total }})</span>
+                      <component 
+                        :is="expandedShotLists.includes(element.id) ? ChevronUp : ChevronDown" 
+                        class="w-4 h-4 text-gray-400 transition-transform"
+                      />
+                    </button>
+                    <div class="w-24 h-1.5 bg-gray-100 rounded-full overflow-hidden">
+                      <div 
+                        class="h-full rounded-full transition-all duration-500"
+                        :class="getShotProgressBgClass(element.id)"
+                        :style="{ width: `${getShotStats(element.id).percent}%` }"
+                      ></div>
+                    </div>
+                  </div>
+
+                  <div 
+                    v-show="expandedShotLists.includes(element.id!)"
+                    class="space-y-2 animate-fade-in"
+                  >
+                    <div
+                      v-for="shot in getShots(element.id!)"
+                      :key="shot.id"
+                      class="flex items-start gap-3 p-2.5 rounded-lg transition-all duration-200"
+                      :class="shot.completed ? 'bg-green-50' : 'bg-gray-50 hover:bg-champagne-50/50'"
+                    >
+                      <button
+                        @click="handleToggleShot(shot.id)"
+                        class="mt-0.5 flex-shrink-0 w-5 h-5 rounded-md border-2 flex items-center justify-center transition-all duration-200"
+                        :class="shot.completed 
+                          ? 'bg-green-500 border-green-500 text-white' 
+                          : 'border-gray-300 hover:border-primary-400'"
+                      >
+                        <svg v-if="shot.completed" class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7" />
+                        </svg>
+                      </button>
+                      <div class="flex-1 min-w-0">
+                        <div class="flex items-center gap-2">
+                          <p 
+                            class="text-sm font-medium transition-all duration-200"
+                            :class="shot.completed ? 'text-gray-400 line-through' : 'text-gray-800'"
+                          >
+                            {{ shot.title }}
+                          </p>
+                          <span 
+                            class="inline-flex px-1.5 py-0.5 rounded text-[10px] font-medium"
+                            :class="getPriorityClass(shot.priority)"
+                          >
+                            {{ getPriorityLabel(shot.priority) }}
+                          </span>
+                        </div>
+                        <p 
+                          v-if="shot.description" 
+                          class="text-xs mt-0.5 transition-all duration-200"
+                          :class="shot.completed ? 'text-gray-300' : 'text-gray-500'"
+                        >
+                          {{ shot.description }}
+                        </p>
+                      </div>
+                    </div>
+
+                    <div v-if="getShots(element.id!).length === 0" class="text-center py-4 text-xs text-gray-400">
+                      暂无拍摄任务
+                    </div>
+                  </div>
+                </div>
+              </template>
             </div>
           </template>
         </div>
@@ -144,6 +238,8 @@
 import { ref, onMounted, onUnmounted, nextTick, watch, computed } from 'vue'
 import draggable from 'vuedraggable'
 import { useRoute, useRouter } from 'vue-router'
+import { ChevronDown, ChevronUp } from 'lucide-vue-next'
+import { usePhotoShotsStore, type PhotoShot } from '@/stores/photoShots'
 
 type SeparatorItem = { type: 'separator'; label: string }
 type EventItem = {
@@ -167,17 +263,86 @@ const props = withDefaults(defineProps<{
   draggable?: boolean
   staffOptions?: StaffOption[]
   highlightId?: string
+  showPhotoShots?: boolean
 }>(), {
   editable: false,
   draggable: false,
   staffOptions: () => [],
-  highlightId: ''
+  highlightId: '',
+  showPhotoShots: false
 })
 
 const emit = defineEmits<{
   'update:personInCharge': [id: string, personId: string | undefined, personName: string]
   'update:order': [orderedIds: string[]]
 }>()
+
+const photoShotsStore = usePhotoShotsStore()
+const shotEnabled = computed(() => props.showPhotoShots)
+const expandedShotLists = ref<string[]>([])
+
+function toggleShotList(scheduleItemId: string) {
+  const idx = expandedShotLists.value.indexOf(scheduleItemId)
+  if (idx >= 0) {
+    expandedShotLists.value.splice(idx, 1)
+  } else {
+    expandedShotLists.value.push(scheduleItemId)
+  }
+}
+
+function getShots(scheduleItemId: string): PhotoShot[] {
+  return photoShotsStore.getShotsByScheduleItem(scheduleItemId)
+}
+
+function getShotStats(scheduleItemId: string) {
+  return photoShotsStore.getStatsByScheduleItem(scheduleItemId)
+}
+
+function handleToggleShot(shotId: string) {
+  photoShotsStore.toggleShot(shotId)
+}
+
+function getPriorityClass(priority: PhotoShot['priority']): string {
+  switch (priority) {
+    case 'essential':
+      return 'bg-red-100 text-red-600'
+    case 'important':
+      return 'bg-amber-100 text-amber-600'
+    case 'optional':
+      return 'bg-gray-100 text-gray-500'
+    default:
+      return 'bg-gray-100 text-gray-500'
+  }
+}
+
+function getPriorityLabel(priority: PhotoShot['priority']): string {
+  switch (priority) {
+    case 'essential':
+      return '必拍'
+    case 'important':
+      return '重要'
+    case 'optional':
+      return '可选'
+    default:
+      return ''
+  }
+}
+
+function getShotProgressClass(scheduleItemId: string): string {
+  const stats = getShotStats(scheduleItemId)
+  if (stats.total === 0) return 'bg-gray-100 text-gray-400'
+  if (stats.percent === 100) return 'bg-green-100 text-green-600'
+  if (stats.percent >= 50) return 'bg-champagne-100 text-champagne-500'
+  return 'bg-primary-50 text-primary-500'
+}
+
+function getShotProgressBgClass(scheduleItemId: string): string {
+  const stats = getShotStats(scheduleItemId)
+  if (stats.total === 0) return 'bg-gray-200'
+  if (stats.percent === 100) return 'bg-green-500'
+  if (stats.percent >= 50) return 'bg-champagne-400'
+  return 'bg-primary-400'
+}
 
 function isSeparator(item: TimelineItem): item is SeparatorItem {
   return item.type === 'separator'
@@ -258,6 +423,9 @@ const scrollToHighlight = (id: string) => {
         const eventItem = localItems.value.find(item => isEvent(item) && item.id === id)
         if (eventItem && props.editable) {
           startEdit(eventItem as EventItem)
+        }
+        if (props.showPhotoShots && id && !expandedShotLists.value.includes(id)) {
+          expandedShotLists.value.push(id)
         }
       }
     }, 600)

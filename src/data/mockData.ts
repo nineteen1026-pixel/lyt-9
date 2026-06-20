@@ -191,6 +191,17 @@ export interface Notice {
 
 export type EmergencyContactCategory = 'guest' | 'vendor' | 'staff' | 'custom'
 
+export interface PhotoShot {
+  id: string
+  scheduleItemId: string
+  title: string
+  description: string
+  completed: boolean
+  completedAt?: number
+  order: number
+  priority: 'essential' | 'important' | 'optional'
+}
+
 export interface EmergencyContact {
   id: string
   name: string
@@ -380,6 +391,26 @@ export const mockEmergencyContacts: EmergencyContact[] = [
   { id: 'ec3', name: '甜品师', phone: '13600136001', category: 'custom', role: '甜品', remark: '婚礼蛋糕+甜品台' },
   { id: 'ec4', name: '灯光师', phone: '13500135001', category: 'custom', role: '灯光', remark: '仪式灯光+追光灯' },
   { id: 'ec5', name: '音响师', phone: '13400134001', category: 'custom', role: '音响', remark: '全场音响+背景音乐' }
+]
+
+export const mockPhotoShots: PhotoShot[] = [
+  { id: 'ps1', scheduleItemId: '1', title: '新娘化妆特写', description: '新娘化妆过程、妆面细节', completed: false, order: 1, priority: 'essential' },
+  { id: 'ps2', scheduleItemId: '1', title: '婚纱礼服展示', description: '婚纱、婚鞋、首饰细节', completed: false, order: 2, priority: 'important' },
+  { id: 'ps3', scheduleItemId: '1', title: '伴娘合影', description: '新娘与伴娘团合影', completed: false, order: 3, priority: 'important' },
+  { id: 'ps4', scheduleItemId: '2', title: '新郎出发', description: '新郎整理着装、伴郎团合影', completed: false, order: 1, priority: 'essential' },
+  { id: 'ps5', scheduleItemId: '2', title: '接亲车队', description: '车队整装待发、车辆装饰', completed: false, order: 2, priority: 'important' },
+  { id: 'ps6', scheduleItemId: '3', title: '堵门游戏', description: '堵门、找鞋、互动游戏', completed: false, order: 1, priority: 'essential' },
+  { id: 'ps7', scheduleItemId: '3', title: '求婚告白', description: '新郎跪地求婚、戴手捧花', completed: false, order: 2, priority: 'essential' },
+  { id: 'ps8', scheduleItemId: '3', title: '敬茶改口', description: '新人向新娘父母敬茶', completed: false, order: 3, priority: 'essential' },
+  { id: 'ps9', scheduleItemId: '4', title: '出门仪式', description: '新娘出门、撑红伞', completed: false, order: 1, priority: 'important' },
+  { id: 'ps10', scheduleItemId: '5', title: '新人合影', description: '酒店外景拍摄', completed: false, order: 1, priority: 'essential' },
+  { id: 'ps11', scheduleItemId: '5', title: '迎宾合影', description: '新人迎宾、与宾客合影', completed: false, order: 2, priority: 'important' },
+  { id: 'ps12', scheduleItemId: '6', title: '新人入场', description: '走红毯、父亲交接', completed: false, order: 1, priority: 'essential' },
+  { id: 'ps13', scheduleItemId: '6', title: '誓言交换戒指', description: '交换戒指、亲吻新娘', completed: false, order: 2, priority: 'essential' },
+  { id: 'ps14', scheduleItemId: '6', title: '婚礼仪式', description: '仪式全程跟拍', completed: false, order: 3, priority: 'important' },
+  { id: 'ps15', scheduleItemId: '7', title: '新人敬酒', description: '逐桌敬酒、宾客互动', completed: false, order: 1, priority: 'important' },
+  { id: 'ps16', scheduleItemId: '7', title: '抛捧花', description: '抛捧花、抛袜带', completed: false, order: 2, priority: 'optional' },
+  { id: 'ps17', scheduleItemId: '7', title: '大合影', description: '全体宾客大合影', completed: false, order: 3, priority: 'essential' }
 ]
 
 export const mockExpenseChangeLogs: ExpenseChangeLog[] = [

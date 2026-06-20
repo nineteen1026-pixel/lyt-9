@@ -1,26 +1,32 @@
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, ref } from 'vue'
 import { useRoute } from 'vue-router'
 import { useScheduleStore } from '@/stores/schedule'
 import { useRehearsalStore } from '@/stores/rehearsal'
 import { useRoleStore } from '@/stores/role'
+import { usePhotoShotsStore } from '@/stores/photoShots'
 import Timeline from '@/components/Timeline.vue'
-import { Calendar } from 'lucide-vue-next'
+import { Calendar, Camera, RefreshCw } from 'lucide-vue-next'
 import RoleSwitcher from '@/components/RoleSwitcher.vue'
 import { storeToRefs } from 'pinia'
 
 const scheduleStore = useScheduleStore()
 const rehearsalStore = useRehearsalStore()
 const roleStore = useRoleStore()
+const photoShotsStore = usePhotoShotsStore()
 const route = useRoute()
 const { weddingDate, items } = storeToRefs(scheduleStore)
 const { staff } = storeToRefs(rehearsalStore)
+
+const showPhotoShots = ref(true)
 
 const highlightId = computed(() => (route.query.highlight as string) || '')
 
 const staffOptions = computed(() => {
   return staff.value.map(m => ({ id: m.id, name: m.name, role: m.role }))
 })
+
+const photoStats = computed(() => photoShotsStore.totalStats)
 
 const formatDate = (dateStr: string) => {
   const date = new Date(dateStr)
@@ -74,19 +80,62 @@ const handlePersonInChargeUpdate = (id: string, personId: string | undefined, pe
 const handleOrderUpdate = (orderedIds: string[]) => {
   scheduleStore.reorderItems(orderedIds)
 }
+
+const handleResetShots = () => {
+  if (confirm('确定要重置所有拍摄任务的完成状态吗？')) {
+    photoShotsStore.resetAll()
+  }
+}
 </script>
 
 <template>
   <div class="min-h-screen bg-gradient-to-br from-primary-50 via-ivory to-champagne-100 pb-20">
     <div class="animate-fade-in">
-      <div class="bg-gradient-to-r from-primary-400 to-primary-500 px-6 pt-12 pb-16 rounded-b-3xl shadow-lg">
-        <div class="flex items-center justify-between mb-4">
-          <div class="w-28"></div>
-          <div class="text-center">
-            <h1 class="text-3xl font-serif font-bold text-white">婚礼流程</h1>
-            <p class="text-primary-100 mt-2">精心安排，圆满时刻</p>
+      <div class="bg-gradient-to-r from-primary-400 to-primary-500 px-6 pt-12 pb-20 rounded-b-3xl shadow-lg relative overflow-hidden">
+        <div class="absolute inset-0 opacity-10">
+          <div class="absolute -top-20 -right-20 w-64 h-64 rounded-full bg-white"></div>
+          <div class="absolute -bottom-10 -left-10 w-48 h-48 rounded-full bg-white"></div>
+        </div>
+        <div class="relative z-10">
+          <div class="flex items-center justify-between mb-4">
+            <div class="w-28"></div>
+            <div class="text-center">
+              <h1 class="text-3xl font-serif font-bold text-white">婚礼流程</h1>
+              <p class="text-primary-100 mt-2">精心安排，圆满时刻</p>
+            </div>
+            <RoleSwitcher />
           </div>
-          <RoleSwitcher />
+
+          <div class="grid grid-cols-3 gap-3 mt-6">
+            <div class="bg-white/15 backdrop-blur-sm rounded-2xl p-3 text-center">
+              <p class="text-2xl font-bold text-white">{{ items.length }}</p>
+              <p class="text-xs text-primary-100 mt-0.5">流程节点</p>
+            </div>
+            <div class="bg-white/15 backdrop-blur-sm rounded-2xl p-3 text-center">
+              <p class="text-2xl font-bold text-white">{{ photoStats.total }}</p>
+              <p class="text-xs text-primary-100 mt-0.5">拍摄任务</p>
+            </div>
+            <div class="bg-white/15 backdrop-blur-sm rounded-2xl p-3 text-center">
+              <p class="text-2xl font-bold text-white">{{ photoStats.completed }}</p>
+              <p class="text-xs text-primary-100 mt-0.5">已完成拍摄</p>
+            </div>
+          </div>
+
+          <div v-if="photoStats.total > 0" class="mt-4 bg-white/20 backdrop-blur-sm rounded-2xl p-4">
+            <div class="flex items-center justify-between mb-2">
+              <div class="flex items-center gap-2">
+                <Camera class="w-4 h-4 text-white" />
+                <p class="text-sm text-primary-50 font-medium">整体拍摄进度</p>
+              </div>
+              <span class="text-sm font-bold text-white">{{ photoStats.percent }}%</span>
+            </div>
+            <div class="h-2 bg-white/20 rounded-full overflow-hidden">
+              <div 
+                class="h-full rounded-full transition-all duration-700 ease-out bg-gradient-to-r from-champagne-300 to-white"
+                :style="{ width: `${photoStats.percent}%` }"
+              ></div>
+            </div>
+          </div>
         </div>
       </div>
 
@@ -109,6 +158,38 @@ const handleOrderUpdate = (orderedIds: string[]) => {
           />
         </div>
 
+        <div class="animate-slide-up bg-white rounded-2xl p-4 shadow-md mb-6" style="animation-delay: 0.15s">
+          <div class="flex items-center justify-between">
+            <div class="flex items-center gap-3">
+              <div class="w-9 h-9 rounded-lg bg-champagne-100 flex items-center justify-center">
+                <Camera class="w-4 h-4 text-champagne-500" />
+              </div>
+              <div>
+                <p class="text-sm font-medium text-gray-800">摄影拍摄清单</p>
+                <p class="text-xs text-gray-500">婚礼当日按节点逐项勾选</p>
+              </div>
+            </div>
+            <div class="flex items-center gap-2">
+              <button
+                @click="handleResetShots"
+                class="flex items-center gap-1 px-3 py-1.5 text-xs text-gray-500 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors"
+              >
+                <RefreshCw class="w-3.5 h-3.5" />
+                重置
+              </button>
+              <button
+                @click="showPhotoShots = !showPhotoShots"
+                class="px-4 py-1.5 rounded-lg text-xs font-medium transition-all"
+                :class="showPhotoShots 
+                  ? 'bg-primary-500 text-white' 
+                  : 'bg-gray-100 text-gray-600 hover:bg-gray-200'"
+              >
+                {{ showPhotoShots ? '显示中' : '已隐藏' }}
+              </button>
+            </div>
+          </div>
+        </div>
+
         <div class="mb-4 text-xs text-primary-400 text-right flex items-center justify-end gap-4">
           <span class="flex items-center gap-1">
             <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -125,6 +206,7 @@ const handleOrderUpdate = (orderedIds: string[]) => {
           :draggable="true"
           :staff-options="staffOptions"
           :highlight-id="highlightId"
+          :show-photo-shots="showPhotoShots"
           @update:person-in-charge="handlePersonInChargeUpdate"
           @update:order="handleOrderUpdate"
         />
