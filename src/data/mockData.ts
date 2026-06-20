@@ -175,6 +175,11 @@ export interface FittingRecord {
   date: string
   time: string
   dressName: string
+  dressId?: string
+  alterationFee: number
+  accessoryFee: number
+  cleaningFee: number
+  otherFee: number
   notes: string
 }
 
@@ -356,9 +361,10 @@ export const mockSizeChart: SizeChartRow[] = [
 ]
 
 export const mockFittingRecords: FittingRecord[] = [
-  { id: '1', date: '2024-09-01', time: '14:00', dressName: '主纱试穿', notes: '整体效果很好，腰部需要修改收紧2cm' },
-  { id: '2', date: '2024-09-10', time: '15:30', dressName: '出门纱试穿', notes: '尺码合适，长度刚好' },
-  { id: '3', date: '2024-09-20', time: '10:00', dressName: '最终试穿', notes: '全部修改完成，确认无误' }
+  { id: '1', date: '2024-09-01', time: '14:00', dressName: '维多利亚女王（主纱）', dressId: '1', alterationFee: 500, accessoryFee: 300, cleaningFee: 0, otherFee: 0, notes: '整体效果很好，腰部需要修改收紧2cm，配长款头纱+蕾丝手套' },
+  { id: '2', date: '2024-09-10', time: '15:30', dressName: '简约优雅（出门纱）', dressId: '2', alterationFee: 200, accessoryFee: 150, cleaningFee: 0, otherFee: 0, notes: '尺码合适，长度刚好，配蝴蝶结发饰' },
+  { id: '3', date: '2024-09-20', time: '10:00', dressName: '东方佳人（敬酒服）', dressId: '3', alterationFee: 300, accessoryFee: 0, cleaningFee: 0, otherFee: 0, notes: '旗袍领口微调，赠送绣鞋' },
+  { id: '4', date: '2024-09-22', time: '14:30', dressName: '最终确认试穿', dressId: '1', alterationFee: 0, accessoryFee: 0, cleaningFee: 200, otherFee: 100, notes: '三件礼服最终确认，清洗费+保管费' }
 ]
 
 export const mockNotices: Notice[] = [

@@ -120,7 +120,14 @@ const getSelectedOptions = (category: string) => {
     case '婚纱':
       return dressStore.dresses
         .filter(d => d.contracted)
-        .map(d => ({ id: d.id, name: d.name, subtitle: `${d.brand} · ${d.type}`, price: d.contractPrice, image: d.image }))
+        .map(d => {
+          const fittingFee = dressStore.getFittingFeeForDress(d.id)
+          const totalPrice = d.contractPrice + fittingFee
+          const subtitle = fittingFee > 0
+            ? `${d.brand} · ${d.type} · 含试穿费¥${fittingFee.toLocaleString()}`
+            : `${d.brand} · ${d.type}`
+          return { id: d.id, name: d.name, subtitle, price: totalPrice, image: d.image, contractPrice: d.contractPrice, fittingFee }
+        })
     default:
       return []
   }
@@ -443,7 +450,27 @@ const getOwnerClass = (category: string) => {
                       </div>
                       <div class="text-right flex-shrink-0">
                         <p class="font-bold text-green-600 text-sm">{{ formatCurrency(opt.price) }}</p>
-                        <span class="text-[10px] text-green-500">合同价</span>
+                        <span v-if="item.category === '婚纱' && opt['fittingFee'] > 0" class="text-[10px] text-green-500">
+                          合同¥{{ (opt['contractPrice'] || 0).toLocaleString() }} + 试穿¥{{ (opt['fittingFee'] || 0).toLocaleString() }}
+                        </span>
+                        <span v-else class="text-[10px] text-green-500">合同价</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div v-if="item.category === '婚纱' && dressStore.totalFittingFee > 0" class="mt-4 p-3 bg-primary-50 rounded-xl border border-primary-100">
+                    <div class="text-xs space-y-1.5">
+                      <div class="flex justify-between">
+                        <span class="text-gray-500">合同金额合计</span>
+                        <span class="font-medium text-gray-700">{{ formatCurrency(dressStore.totalContractPrice) }}</span>
+                      </div>
+                      <div class="flex justify-between">
+                        <span class="text-gray-500">试穿费用合计</span>
+                        <span class="font-medium text-primary-500">{{ formatCurrency(dressStore.totalFittingFee) }}</span>
+                      </div>
+                      <div class="flex justify-between pt-1.5 border-t border-primary-200">
+                        <span class="font-bold text-gray-700">总计（计入预算）</span>
+                        <span class="font-bold text-primary-600">{{ formatCurrency(dressStore.totalContractedWithFitting) }}</span>
                       </div>
                     </div>
                   </div>

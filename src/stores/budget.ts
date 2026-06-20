@@ -232,11 +232,14 @@ export const useBudgetStore = defineStore('budget', () => {
     const photoNames = photographyStore.items.filter(p => p.contracted).map(p => p.teamName).join('、')
     recordContractChange('摄影', totalPhotographyContracted, '系统同步', photoNames || '无')
 
-    const totalDressContracted = dressStore.dresses
-      .filter(d => d.contracted)
-      .reduce((sum, d) => sum + d.contractPrice, 0)
     const dressNames = dressStore.dresses.filter(d => d.contracted).map(d => d.name).join('、')
-    recordContractChange('婚纱', totalDressContracted, '系统同步', dressNames || '无')
+    const fittingFeeNote = dressStore.totalFittingFee > 0
+      ? `，含试穿费用¥${dressStore.totalFittingFee.toLocaleString()}`
+      : ''
+    const dressDescription = dressNames
+      ? `${dressNames}${fittingFeeNote}`
+      : '无'
+    recordContractChange('婚纱', dressStore.totalContractedWithFitting, '系统同步', dressDescription)
   }
 
   return {

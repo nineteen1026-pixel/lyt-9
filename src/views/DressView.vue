@@ -108,9 +108,12 @@ const hasContractedByType = (type: DressCategory) =>
 const contractedByTypeCount = (type: DressCategory) =>
   dressStore.dresses.filter(d => d.type === type && d.contracted).length
 
-const totalContractedPrice = computed(() =>
-  dressStore.dresses.filter(d => d.contracted).reduce((s, d) => s + d.contractPrice, 0)
-)
+const totalContractedPrice = computed(() => dressStore.totalContractedWithFitting)
+const totalContractOnly = computed(() => dressStore.totalContractPrice)
+const totalFittingFee = computed(() => dressStore.totalFittingFee)
+
+const calcRecordTotal = (record: any) =>
+  record.alterationFee + record.accessoryFee + record.cleaningFee + record.otherFee
 
 const contractedCount = computed(() => dressStore.dresses.filter(d => d.contracted).length)
 const alternativeCount = computed(() => dressStore.dresses.filter(d => !d.contracted).length)
@@ -346,9 +349,21 @@ watch(
             </div>
           </div>
 
-          <div v-if="totalContractedPrice > 0" class="mt-4 bg-white/20 backdrop-blur-sm rounded-2xl p-3 text-center">
-            <p class="text-sm text-primary-50">已确认合同金额</p>
-            <p class="text-xl font-bold text-white mt-0.5">{{ formatPrice(totalContractedPrice) }}</p>
+          <div v-if="totalContractedPrice > 0" class="mt-4 bg-white/20 backdrop-blur-sm rounded-2xl p-3">
+            <div class="text-center mb-2">
+              <p class="text-sm text-primary-50">已确认总金额（含试穿费用）</p>
+              <p class="text-2xl font-bold text-white mt-0.5">{{ formatPrice(totalContractedPrice) }}</p>
+            </div>
+            <div class="grid grid-cols-2 gap-2 text-xs">
+              <div class="bg-white/10 rounded-xl p-2 text-center">
+                <p class="text-primary-100">合同金额</p>
+                <p class="text-white font-bold mt-0.5">{{ formatPrice(totalContractOnly) }}</p>
+              </div>
+              <div class="bg-white/10 rounded-xl p-2 text-center">
+                <p class="text-primary-100">试穿费用</p>
+                <p class="text-white font-bold mt-0.5">{{ formatPrice(totalFittingFee) }}</p>
+              </div>
+            </div>
           </div>
         </div>
       </div>
@@ -532,17 +547,48 @@ watch(
         </div>
 
         <div v-if="dressStore.fittingRecords.length" class="animate-slide-up" style="animation-delay: 0.6s">
-          <h2 class="text-lg font-bold text-gray-800 mb-4">试纱记录</h2>
+          <div class="flex items-center justify-between mb-4">
+            <h2 class="text-lg font-bold text-gray-800">试纱记录</h2>
+            <div v-if="totalFittingFee > 0" class="text-xs text-primary-500 font-medium">
+              试穿费用合计：{{ formatPrice(totalFittingFee) }}
+            </div>
+          </div>
           <div class="space-y-3">
             <div
               v-for="record in dressStore.fittingRecords"
               :key="record.id"
               class="bg-white rounded-2xl p-4 shadow-md"
             >
-              <div class="flex items-center justify-between mb-2">
-                <p class="font-bold text-gray-800">{{ record.dressName }}</p>
-                <p class="text-sm text-primary-400">{{ record.date }} {{ record.time }}</p>
+              <div class="flex items-center justify-between mb-3">
+                <div>
+                  <p class="font-bold text-gray-800">{{ record.dressName }}</p>
+                  <p class="text-xs text-gray-400 mt-0.5">{{ record.date }} {{ record.time }}</p>
+                </div>
+                <div v-if="calcRecordTotal(record) > 0" class="text-right">
+                  <p class="text-lg font-bold text-primary-500">{{ formatPrice(calcRecordTotal(record)) }}</p>
+                  <p class="text-[10px] text-gray-400">本次费用</p>
+                </div>
               </div>
+
+              <div v-if="calcRecordTotal(record) > 0" class="mb-3 grid grid-cols-4 gap-2 text-xs">
+                <div v-if="record.alterationFee > 0" class="bg-champagne-50 rounded-lg p-2 text-center">
+                  <p class="text-gray-400">修改费</p>
+                  <p class="font-medium text-champagne-400 mt-0.5">{{ formatPrice(record.alterationFee) }}</p>
+                </div>
+                <div v-if="record.accessoryFee > 0" class="bg-primary-50 rounded-lg p-2 text-center">
+                  <p class="text-gray-400">配饰费</p>
+                  <p class="font-medium text-primary-500 mt-0.5">{{ formatPrice(record.accessoryFee) }}</p>
+                </div>
+                <div v-if="record.cleaningFee > 0" class="bg-morandi-green/10 rounded-lg p-2 text-center">
+                  <p class="text-gray-400">清洗费</p>
+                  <p class="font-medium text-morandi-green mt-0.5">{{ formatPrice(record.cleaningFee) }}</p>
+                </div>
+                <div v-if="record.otherFee > 0" class="bg-morandi-purple/10 rounded-lg p-2 text-center">
+                  <p class="text-gray-400">其他费</p>
+                  <p class="font-medium text-morandi-purple mt-0.5">{{ formatPrice(record.otherFee) }}</p>
+                </div>
+              </div>
+
               <p class="text-sm text-gray-600 bg-gray-50 p-3 rounded-xl">{{ record.notes }}</p>
             </div>
           </div>
