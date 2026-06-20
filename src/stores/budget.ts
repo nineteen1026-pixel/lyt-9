@@ -185,19 +185,25 @@ export const useBudgetStore = defineStore('budget', () => {
       .filter(v => v.contracted)
       .reduce((sum, v) => sum + v.contractPrice, 0)
     const venueNames = venuesStore.venues.filter(v => v.contracted).map(v => v.name).join('、')
-    updateActualByCategory('场地', totalVenuesContracted, '场地选型', `同步选型金额：${venueNames || '无'}已签约`, '系统同步', 'sync')
+    const venueItem = getItemByCategory('场地')
+    const venueChangeType: ExpenseChangeType = venueItem && venueItem.actual > 0 ? 'sync' : 'add'
+    updateActualByCategory('场地', totalVenuesContracted, '场地签约', `${venueChangeType === 'add' ? '新增签约入账' : '签约金额同步'}：${venueNames || '无'}`, '系统同步', venueChangeType)
 
     const totalPhotographyContracted = photographyStore.items
       .filter(p => p.contracted)
       .reduce((sum, p) => sum + p.contractPrice, 0)
     const photoNames = photographyStore.items.filter(p => p.contracted).map(p => p.teamName).join('、')
-    updateActualByCategory('摄影', totalPhotographyContracted, '摄影选型', `同步选型金额：${photoNames || '无'}已签约`, '系统同步', 'sync')
+    const photoItem = getItemByCategory('摄影')
+    const photoChangeType: ExpenseChangeType = photoItem && photoItem.actual > 0 ? 'sync' : 'add'
+    updateActualByCategory('摄影', totalPhotographyContracted, '摄影签约', `${photoChangeType === 'add' ? '新增签约入账' : '签约金额同步'}：${photoNames || '无'}`, '系统同步', photoChangeType)
 
     const totalDressContracted = dressStore.dresses
       .filter(d => d.contracted)
       .reduce((sum, d) => sum + d.contractPrice, 0)
     const dressNames = dressStore.dresses.filter(d => d.contracted).map(d => d.name).join('、')
-    updateActualByCategory('婚纱', totalDressContracted, '婚纱选型', `同步选型金额：${dressNames || '无'}已签约`, '系统同步', 'sync')
+    const dressItem = getItemByCategory('婚纱')
+    const dressChangeType: ExpenseChangeType = dressItem && dressItem.actual > 0 ? 'sync' : 'add'
+    updateActualByCategory('婚纱', totalDressContracted, '婚纱签约', `${dressChangeType === 'add' ? '新增签约入账' : '签约金额同步'}：${dressNames || '无'}`, '系统同步', dressChangeType)
   }
 
   return {
