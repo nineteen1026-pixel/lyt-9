@@ -57,7 +57,7 @@ const handleAccessDenied = (event: Event) => {
 onMounted(() => {
   if (typeof window !== 'undefined') {
     const cacheVersion = localStorage.getItem('cache-version')
-    const currentVersion = '1.0.2'
+    const currentVersion = '1.0.3'
     if (cacheVersion !== currentVersion) {
       localStorage.removeItem('wedding-venues')
       localStorage.removeItem('wedding-photography')

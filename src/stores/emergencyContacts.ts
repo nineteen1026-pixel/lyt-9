@@ -23,6 +23,13 @@ export interface AggregatedContact {
   sourceId?: string
 }
 
+const isValidPhone = (phone: string): boolean => {
+  if (!phone) return false
+  if (/[xX*]/.test(phone)) return false
+  const clean = phone.replace(/[\s\-]/g, '')
+  return /^\d+$/.test(clean) && (clean.length === 11 || (clean.length >= 7 && clean.length <= 8))
+}
+
 export const useEmergencyContactsStore = defineStore('emergencyContacts', () => {
   const STORAGE_KEY = 'wedding-emergency-contacts'
 
@@ -35,7 +42,7 @@ export const useEmergencyContactsStore = defineStore('emergencyContacts', () => 
   const guestContacts = computed<AggregatedContact[]>(() => {
     const guestsStore = useGuestsStore()
     return guestsStore.guests
-      .filter(g => g.phone && g.status !== 'declined')
+      .filter(g => isValidPhone(g.phone) && g.status !== 'declined')
       .map(g => ({
         id: `guest-${g.id}`,
         name: g.name,
@@ -50,7 +57,7 @@ export const useEmergencyContactsStore = defineStore('emergencyContacts', () => 
   const staffContacts = computed<AggregatedContact[]>(() => {
     const rehearsalStore = useRehearsalStore()
     return rehearsalStore.staff
-      .filter(s => s.phone)
+      .filter(s => isValidPhone(s.phone))
       .map(s => ({
         id: `staff-${s.id}`,
         name: s.name,
@@ -70,39 +77,45 @@ export const useEmergencyContactsStore = defineStore('emergencyContacts', () => 
     venuesStore.venues
       .filter(v => v.contracted)
       .forEach(v => {
-        const phoneMatch = (v.notes || '').match(/1[3-9]\d[xX*\d]{4}\d{4}|1[3-9]\d{9}|\d{3,4}[-\s]?\d{7,8}/)
-        contacts.push({
-          id: `venue-${v.id}`,
-          name: v.name,
-          phone: phoneMatch?.[0] || '',
-          category: 'vendor' as EmergencyContactCategory,
-          role: '场地',
-          remark: v.address,
-          sourceId: v.id
-        })
+        const phoneMatch = (v.notes || '').match(/1[3-9]\d{9}|\d{3,4}[-\s]?\d{7,8}/)
+        const phone = phoneMatch?.[0] || ''
+        if (isValidPhone(phone)) {
+          contacts.push({
+            id: `venue-${v.id}`,
+            name: v.name,
+            phone,
+            category: 'vendor' as EmergencyContactCategory,
+            role: '场地',
+            remark: v.address,
+            sourceId: v.id
+          })
+        }
       })
 
     photographyStore.items
       .filter(p => p.contracted)
       .forEach(p => {
-        const phoneMatch = (p.notes || '').match(/1[3-9]\d[xX*\d]{4}\d{4}|1[3-9]\d{9}|\d{3,4}[-\s]?\d{7,8}/)
-        contacts.push({
-          id: `photo-${p.id}`,
-          name: p.teamName,
-          phone: phoneMatch?.[0] || '',
-          category: 'vendor' as EmergencyContactCategory,
-          role: '摄影',
-          remark: p.style,
-          sourceId: p.id
-        })
+        const phoneMatch = (p.notes || '').match(/1[3-9]\d{9}|\d{3,4}[-\s]?\d{7,8}/)
+        const phone = phoneMatch?.[0] || ''
+        if (isValidPhone(phone)) {
+          contacts.push({
+            id: `photo-${p.id}`,
+            name: p.teamName,
+            phone,
+            category: 'vendor' as EmergencyContactCategory,
+            role: '摄影',
+            remark: p.style,
+            sourceId: p.id
+          })
+        }
       })
 
-    return contacts.filter(c => c.phone)
+    return contacts
   })
 
   const customAggregated = computed<AggregatedContact[]>(() => {
     return customContacts.value
-      .filter(c => c.category === 'custom')
+      .filter(c => c.category === 'custom' && isValidPhone(c.phone))
       .map(c => ({
         id: c.id,
         name: c.name,

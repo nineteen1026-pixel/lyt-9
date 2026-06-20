@@ -223,13 +223,13 @@ export const mockGuests: Guest[] = [
 ]
 
 export const mockVenues: Venue[] = [
-  { id: '1', name: '花园酒店宴会厅', address: '北京市朝阳区建国路88号', capacity: 300, price: 48000, status: 'booked', image: 'https://images.unsplash.com/photo-1519167758481-83f550bb49b3?w=800', features: ['草坪婚礼', '中式宴席', '停车场', '化妆间'], contracted: true, contractPrice: 48000, pros: ['交通便利', '场地宽敞', '配套设施齐全', '餐饮口碑好'], cons: ['周末档期紧张', '起订桌数较多'], rating: 4.8, notes: '销售经理王经理，电话138xxxx8888', createdAt: Date.now() - 86400000 * 10 },
+  { id: '1', name: '花园酒店宴会厅', address: '北京市朝阳区建国路88号', capacity: 300, price: 48000, status: 'booked', image: 'https://images.unsplash.com/photo-1519167758481-83f550bb49b3?w=800', features: ['草坪婚礼', '中式宴席', '停车场', '化妆间'], contracted: true, contractPrice: 48000, pros: ['交通便利', '场地宽敞', '配套设施齐全', '餐饮口碑好'], cons: ['周末档期紧张', '起订桌数较多'], rating: 4.8, notes: '销售经理王经理，电话13812348888', createdAt: Date.now() - 86400000 * 10 },
   { id: '2', name: '海景度假村', address: '青岛市市南区海滨路1号', capacity: 200, price: 68000, status: 'alternative', image: 'https://images.unsplash.com/photo-1464366400600-7168b8af9bc3?w=800', features: ['海边仪式', '西式自助', '海景套房', '烟花秀'], contracted: false, contractPrice: 0, pros: ['海景无敌', '环境优美', '可办海边仪式', '赠送婚房'], cons: ['距离市区远', '受天气影响大'], rating: 4.6, notes: '需安排大巴接送宾客', createdAt: Date.now() - 86400000 * 7 },
   { id: '3', name: '法式庄园会所', address: '上海市浦东新区法式园区88号', capacity: 150, price: 58000, status: 'alternative', image: 'https://images.unsplash.com/photo-1465495976277-4387d4b0b4c6?w=800', features: ['法式花园', '高端定制', '红酒窖', '直升机坪'], contracted: false, contractPrice: 0, pros: ['私密性好', '风格独特', '服务品质高', '拍照出片'], cons: ['价格偏高', '容纳人数有限'], rating: 4.9, notes: '有独立新娘房和花园仪式区', createdAt: Date.now() - 86400000 * 5 }
 ]
 
 export const mockPhotography: Photography[] = [
-  { id: '1', teamName: '光影纪摄影工作室', style: '清新自然', packageType: '全天跟拍', price: 12800, shootDate: '2024-10-01', contracted: true, contractPrice: 12800, pros: ['拍摄风格自然', '团队经验丰富', '修片速度快', '沟通顺畅'], cons: ['热门档期需提前预约'], rating: 4.7, notes: '首席摄影师李明，电话139xxxx9999，需付定金30%', createdAt: Date.now() - 86400000 * 10 },
+  { id: '1', teamName: '光影纪摄影工作室', style: '清新自然', packageType: '全天跟拍', price: 12800, shootDate: '2024-10-01', contracted: true, contractPrice: 12800, pros: ['拍摄风格自然', '团队经验丰富', '修片速度快', '沟通顺畅'], cons: ['热门档期需提前预约'], rating: 4.7, notes: '首席摄影师李明，电话13912349999，需付定金30%', createdAt: Date.now() - 86400000 * 10 },
   { id: '2', teamName: '时光影像', style: '复古胶片', packageType: '半天跟拍', price: 6800, shootDate: '2024-09-28', contracted: false, contractPrice: 0, pros: ['价格实惠', '胶片质感独特', '送花絮视频'], cons: ['只有半天时间', '不含航拍'], rating: 4.3, notes: '适合预算有限的新人', createdAt: Date.now() - 86400000 * 6 },
   { id: '3', teamName: '唯爱摄影', style: '韩式唯美', packageType: '旅拍套餐', price: 18800, shootDate: '2024-09-15', contracted: false, contractPrice: 0, pros: ['旅拍套餐超值', '韩式妆容精致', '多套服装造型', '底片全送'], cons: ['需出差两天', '价格较高'], rating: 4.9, notes: '包含三亚两天旅拍，食宿全包', createdAt: Date.now() - 86400000 * 4 }
 ]
